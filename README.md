@@ -25,7 +25,7 @@ JustWatch. This product uses the TMDB API but is not endorsed or certified by TM
    Or set `TMDB_KEY` in the environment when you build.
 3. Pick your services in [`app/src/main/res/values/config.xml`](app/src/main/res/values/config.xml):
    one line per subscription, `TMDb provider name|app package`. Several names, separated by commas, cover a
-   service that was renamed (`HBO Max,Max`). A number is read as a TMDb provider id. A service TMDb doesn't
+   service that was renamed (`HBO Max,Max`; TMDb calls TV 2 Play just `TV 2`). A number is read as a TMDb provider id. A service TMDb doesn't
    know is named in the status line at the bottom of the screen, so you can correct it. Region (`DK`) and
    language (`da-DK`) are set in the same file.
 
@@ -62,10 +62,16 @@ time sends nothing. When TMDb can't be reached, the last answers are shown.
 
 ## Limits
 
+- TMDb's subscription filter also lets through titles a service only rents or sells (on Viaplay, 18 of the top
+  20 "subscription" movies were rentals), so each title's availability is checked before it is shown. The first
+  load sends about 150 small requests and takes 15 to 30 seconds; after that the cache answers.
+- Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles popular elsewhere but
+  unknown here.
 - OK opens the service's app at its home screen, not at the title: TMDb has no ids those apps accept.
 - TMDb's availability data is JustWatch's and can lag a day or two behind what a service actually has.
 - Plots are in Danish where TMDb has one, and empty otherwise.
 
 ## Tested on
 
-Not yet tested on a TV.
+Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: rows, posters,
+D-pad, OK into HBO Max, and the module card.

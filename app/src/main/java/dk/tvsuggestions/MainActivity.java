@@ -29,6 +29,12 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * What is included in your streaming subscriptions right now, from TMDb's discover API (catalogue data by
@@ -77,6 +83,9 @@ public class MainActivity extends Activity {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(dp(48), dp(24), dp(48), dp(14));
+        // The rows run on to the right edge of the screen, past the padding.
+        col.setClipToPadding(false);
+        col.setClipChildren(false);
         root.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout header = new LinearLayout(this);
@@ -88,7 +97,7 @@ public class MainActivity extends Activity {
         meta.setPadding(0, dp(6), 0, dp(8));
         header.addView(meta);
         overview = text(15, Typeface.NORMAL, 0xCCFFFFFF);
-        overview.setMaxLines(3);
+        overview.setMaxLines(2);
         overview.setEllipsize(TextUtils.TruncateAt.END);
         overview.setLineSpacing(0, 1.15f);
         header.addView(overview, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.6f), -2));
@@ -142,6 +151,7 @@ public class MainActivity extends Activity {
         String region = getString(R.string.region);
         String language = getString(R.string.language);
         int perRow = getResources().getInteger(R.integer.per_row);
+        int minVotes = getResources().getInteger(R.integer.min_votes);
         List<Suggestions.Service> services = new ArrayList<>();
         for (String line : getResources().getStringArray(R.array.services)) {
             Suggestions.Service s = Suggestions.parseService(line);
@@ -160,12 +170,19 @@ public class MainActivity extends Activity {
                     if (s.providerId >= 0) found.add(s);
                     else r.unmatched.add(s.names[0]);
                 }
+                Map<String, Set<Integer>> streams = new ConcurrentHashMap<>();
+                // When TMDb can't say, the title is kept: a rental now and then beats empty rows while offline.
+                Suggestions.Check check = (t, s) -> {
+                    Set<Integer> on = streamsOn(t, region, streams);
+                    return on == null || on.contains(s.providerId);
+                };
                 for (boolean tv : new boolean[] {false, true}) {
                     List<List<Suggestions.Title>> lists = new ArrayList<>();
                     for (Suggestions.Service s : found) {
                         List<Suggestions.Title> l = new ArrayList<>();
                         try {
-                            l = Suggestions.parseDiscover(tmdb.json(Suggestions.discoverPath(tv, s.providerId, region, language)), tv);
+                            l = Suggestions.parseDiscover(tmdb.json(
+                                    Suggestions.discoverPath(tv, s.providerId, region, language, minVotes)), tv);
                         } catch (Tmdb.KeyRefused e) {
                             throw e;
                         } catch (Exception e) {
@@ -173,7 +190,18 @@ public class MainActivity extends Activity {
                         }
                         lists.add(l);
                     }
-                    List<Suggestions.Title> mixed = Suggestions.mix(lists, found, perRow);
+                    // Each service's share of the row, plus a few for titles that turn out to be rentals, checked
+                    // in parallel; any further title is checked when mix reaches it.
+                    int share = found.isEmpty() ? 0 : perRow / found.size() + 6;
+                    ExecutorService pool = Executors.newFixedThreadPool(6);
+                    for (List<Suggestions.Title> l : lists) {
+                        for (Suggestions.Title t : l.subList(0, Math.min(share, l.size()))) {
+                            pool.execute(() -> streamsOn(t, region, streams));
+                        }
+                    }
+                    pool.shutdown();
+                    pool.awaitTermination(60, TimeUnit.SECONDS);
+                    List<Suggestions.Title> mixed = Suggestions.mix(lists, found, perRow, check);
                     if (tv) r.series = mixed;
                     else r.movies = mixed;
                 }
@@ -187,6 +215,21 @@ public class MainActivity extends Activity {
             }
             main.post(() -> show(r));
         }).start();
+    }
+
+    /** The providers that include t in a subscription here, or null when TMDb can't say. */
+    private Set<Integer> streamsOn(Suggestions.Title t, String region, Map<String, Set<Integer>> known) {
+        String key = (t.tv ? "tv" : "movie") + t.id;
+        Set<Integer> hit = known.get(key);
+        if (hit != null) return hit;
+        try {
+            Set<Integer> ids = Suggestions.flatrate(tmdb.json(Suggestions.watchPath(t)), region);
+            known.put(key, ids);
+            return ids;
+        } catch (Exception e) {
+            Log.w(TAG, "watch providers " + key + ": " + e);
+            return null;
+        }
     }
 
     private void show(Result r) {

@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /** Everything about the suggestions that does not need Android: services, TMDb paths, parsing, mixing. */
 final class Suggestions {
@@ -29,6 +31,11 @@ final class Suggestions {
         String label() {
             return providerName != null ? providerName : names[0];
         }
+    }
+
+    /** Whether a title really streams on a service; TMDb's discover filter alone also lets through rentals. */
+    interface Check {
+        boolean on(Title t, Service s);
     }
 
     static final class Title {
@@ -84,10 +91,29 @@ final class Suggestions {
     }
 
     /** What is included in one subscription in one country, most popular first. */
-    static String discoverPath(boolean tv, int providerId, String region, String language) {
+    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes) {
         return "/discover/" + (tv ? "tv" : "movie") + "?watch_region=" + region + "&with_watch_providers="
                 + providerId + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&include_adult=false"
-                + "&language=" + language + "&page=1";
+                + "&vote_count.gte=" + minVotes + "&language=" + language + "&page=1";
+    }
+
+    /** Where one title can be watched, in every country. */
+    static String watchPath(Title t) {
+        return "/" + (t.tv ? "tv" : "movie") + "/" + t.id + "/watch/providers";
+    }
+
+    /** The providers that include a title in a subscription in one country, from /{type}/{id}/watch/providers. */
+    static Set<Integer> flatrate(JSONObject json, String region) {
+        Set<Integer> out = new TreeSet<>();
+        JSONObject results = json.optJSONObject("results");
+        JSONObject here = results != null ? results.optJSONObject(region) : null;
+        JSONArray list = here != null ? here.optJSONArray("flatrate") : null;
+        if (list == null) return out;
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject p = list.optJSONObject(i);
+            if (p != null) out.add(p.optInt("provider_id", -1));
+        }
+        return out;
     }
 
     static String providersPath(boolean tv, String region, String language) {
@@ -118,9 +144,9 @@ final class Suggestions {
 
     /**
      * One row from each service's list: taken in turns, so every service shows near the start, and a title on
-     * several services appears once with all of them.
+     * several services appears once with all of them. A title that fails the check for a service is left out for it.
      */
-    static List<Title> mix(List<List<Title>> lists, List<Service> services, int max) {
+    static List<Title> mix(List<List<Title>> lists, List<Service> services, int max, Check check) {
         List<Title> out = new ArrayList<>();
         Map<Integer, Title> seen = new HashMap<>();
         int longest = 0;
@@ -131,10 +157,12 @@ final class Suggestions {
                 Title t = lists.get(s).get(i);
                 Title known = seen.get(t.id);
                 if (known != null) {
-                    if (!known.services.contains(services.get(s))) known.services.add(services.get(s));
+                    if (!known.services.contains(services.get(s)) && check.on(known, services.get(s))) {
+                        known.services.add(services.get(s));
+                    }
                     continue;
                 }
-                if (out.size() >= max) continue;
+                if (out.size() >= max || !check.on(t, services.get(s))) continue;
                 t.services.add(services.get(s));
                 seen.put(t.id, t);
                 out.add(t);

@@ -10,7 +10,7 @@
          so you can fix the name. OK on a title opens the first of its services whose app is installed. -->
     <string-array name="services" translatable="false">
         <item>Netflix|com.netflix.ninja</item>
-        <item>TV 2 Play|dk.tv2.tv2playtv</item>
+        <item>TV 2,TV 2 Play|dk.tv2.tv2playtv</item>
         <item>DR TV|dk.dr.tvplayer</item>
         <item>HBO Max,Max|com.wbd.stream</item>
         <item>Disney Plus|com.disney.disneyplus</item>
@@ -20,6 +20,9 @@
 
     <!-- Titles per row. -->
     <integer name="per_row">30</integer>
+    <!-- Leave out titles with fewer TMDb votes: keeps out titles that are popular elsewhere but unknown here.
+         Danish titles get few votes; 50 still leaves DR TV about 30 movies and 30 series. -->
+    <integer name="min_votes">50</integer>
     <!-- How long TMDb answers and posters are kept before they are fetched again, in hours. -->
     <integer name="cache_hours">6</integer>
 

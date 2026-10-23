@@ -79,7 +79,7 @@ public class SuggestionsTest {
         Suggestions.Service b = Suggestions.parseService("B|b");
         List<Suggestions.Title> la = Arrays.asList(title(1), title(2), title(3));
         List<Suggestions.Title> lb = Arrays.asList(title(10), title(2));
-        List<Suggestions.Title> out = Suggestions.mix(Arrays.asList(la, lb), Arrays.asList(a, b), 3);
+        List<Suggestions.Title> out = Suggestions.mix(Arrays.asList(la, lb), Arrays.asList(a, b), 3, (t, sv) -> true);
         assertEquals(3, out.size());
         assertEquals(1, out.get(0).id);
         assertEquals(10, out.get(1).id);
@@ -89,12 +89,42 @@ public class SuggestionsTest {
 
     @Test
     public void discoverAsksForSubscriptionTitlesInTheRegion() {
-        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK");
+        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50);
         assertTrue(p.startsWith("/discover/tv?"));
         assertTrue(p.contains("watch_region=DK"));
         assertTrue(p.contains("with_watch_providers=8"));
         assertTrue(p.contains("with_watch_monetization_types=flatrate"));
         assertTrue(p.contains("language=da-DK"));
+        assertTrue(p.contains("vote_count.gte=50"));
+    }
+
+    @Test
+    public void mixLeavesOutTitlesThatAreOnlyRentedOnAService() {
+        Suggestions.Service a = Suggestions.parseService("A|a");
+        Suggestions.Service b = Suggestions.parseService("B|b");
+        List<Suggestions.Title> la = Arrays.asList(title(1), title(2));
+        List<Suggestions.Title> lb = Arrays.asList(title(2), title(3));
+        // Title 2 streams on A only; B merely rents it.
+        List<Suggestions.Title> out = Suggestions.mix(Arrays.asList(la, lb), Arrays.asList(a, b), 10,
+                (t, sv) -> !(t.id == 2 && sv == b));
+        assertEquals(3, out.size());
+        assertEquals(Arrays.asList(a), out.get(1).services);
+        // Offered by B first and refused there, it still comes in for A.
+        la = Arrays.asList(title(1), title(2));
+        lb = Arrays.asList(title(2), title(3));
+        out = Suggestions.mix(Arrays.asList(lb, la), Arrays.asList(b, a), 10, (t, sv) -> !(t.id == 2 && sv == b));
+        Suggestions.Title two = null;
+        for (Suggestions.Title t : out) if (t.id == 2) two = t;
+        assertEquals(Arrays.asList(a), two.services);
+    }
+
+    @Test
+    public void flatrateReadsOnlyTheRegionsSubscriptions() throws Exception {
+        JSONObject json = new JSONObject("{\"results\":{\"DK\":{\"buy\":[{\"provider_id\":76}],"
+                + "\"flatrate\":[{\"provider_id\":337}]},\"SE\":{\"flatrate\":[{\"provider_id\":76}]}}}");
+        assertEquals(new java.util.TreeSet<>(Arrays.asList(337)), Suggestions.flatrate(json, "DK"));
+        assertTrue(Suggestions.flatrate(json, "NO").isEmpty());
+        assertTrue(Suggestions.flatrate(new JSONObject("{}"), "DK").isEmpty());
     }
 
     private static Suggestions.Title title(int id) {
