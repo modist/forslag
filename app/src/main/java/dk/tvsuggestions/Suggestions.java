@@ -19,21 +19,29 @@ import java.util.TreeSet;
 final class Suggestions {
     private Suggestions() {}
 
-    static final String NETFLIX = "com.netflix.ninja", DISNEY = "com.disney.disneyplus", DRTV = "dk.dr.tvplayer";
+    static final String NETFLIX = "com.netflix.ninja", DISNEY = "com.disney.disneyplus", DRTV = "dk.dr.tvplayer",
+            VIAPLAY = "com.viaplay.android";
+    /** Where a service's titles come from: TMDb, or the service's own catalogue. */
+    static final String FROM_TMDB = "tmdb", FROM_DRTV = "drtv", FROM_VIAPLAY = "viaplay";
 
     /** One line of the services list in config.xml, and the TMDb provider it matched. */
     static final class Service {
         final String[] names;
         final String pkg;
-        /** Titles come from DR's own catalogue, not from TMDb. */
-        final boolean drtv;
+        /** FROM_TMDB, FROM_DRTV or FROM_VIAPLAY. */
+        final String source;
         int providerId = -1;
         String providerName;
 
-        Service(String[] names, String pkg, boolean drtv) {
+        Service(String[] names, String pkg, String source) {
             this.names = names;
             this.pkg = pkg;
-            this.drtv = drtv;
+            this.source = source;
+        }
+
+        /** Titles from the service's own catalogue: what it lists is what it streams, and TMDb is not needed. */
+        boolean own() {
+            return !source.equals(FROM_TMDB);
         }
 
         /** The name to show: TMDb's once matched, else the first one configured. */
@@ -54,10 +62,10 @@ final class Suggestions {
         /** poster and backdrop are full URLs. */
         String name = "", year = "", overview = "", poster = "", backdrop = "";
         double rating;
-        /** What the apps open a title by: Netflix and Disney+ ids from Wikidata, DRTV's own path. */
-        String netflixId = "", disneyId = "", drPath = "";
+        /** What the apps open a title by: Netflix and Disney+ ids from Wikidata, DRTV's and Viaplay's own paths. */
+        String netflixId = "", disneyId = "", drPath = "", viaplayPath = "";
         final List<Service> services = new ArrayList<>();
-        /** TMDb's genre ids, and DR's genre words (lower case), for the genre tabs. */
+        /** TMDb's genre ids, and DR's and Viaplay's genre words (lower case), for the genre tabs. */
         final Set<Integer> genres = new HashSet<>();
         final Set<String> tags = new HashSet<>();
 
@@ -70,6 +78,7 @@ final class Suggestions {
             if (poster.isEmpty()) poster = o.poster;
             if (backdrop.isEmpty()) backdrop = o.backdrop;
             if (drPath.isEmpty()) drPath = o.drPath;
+            if (viaplayPath.isEmpty()) viaplayPath = o.viaplayPath;
             genres.addAll(o.genres);
             tags.addAll(o.tags);
         }
@@ -93,17 +102,17 @@ final class Suggestions {
 
     /**
      * One genre tab: TMDb's genre ids for movies and for series ("" where the genre is not offered, ids joined
-     * with | for "any of"), and the words DR uses in its categories and keywords.
+     * with | for "any of"), and the words DR and Viaplay use for it in their genres, categories and page names.
      */
     static final class Genre {
         final String key, movieIds, tvIds;
-        final String[] drWords;
+        final String[] words;
 
-        Genre(String key, String movieIds, String tvIds, String... drWords) {
+        Genre(String key, String movieIds, String tvIds, String... words) {
             this.key = key;
             this.movieIds = movieIds;
             this.tvIds = tvIds;
-            this.drWords = drWords;
+            this.words = words;
         }
 
         boolean offered(boolean tv) {
@@ -115,9 +124,19 @@ final class Suggestions {
                 if (!id.isEmpty() && t.genres.contains(Integer.parseInt(id))) return true;
             }
             for (String tag : t.tags) {
-                for (String w : drWords) {
+                for (String w : words) {
                     if (tag.contains(w)) return true;
                 }
+            }
+            return false;
+        }
+
+        /** Whether a page name such as "dokumentarserier" or "science-fiction" is this genre's. */
+        boolean names(String slug) {
+            String f = fold(slug);
+            for (String w : words) {
+                String fw = fold(w);
+                if (fw.length() >= 4 && f.contains(fw)) return true;
             }
             return false;
         }
@@ -144,11 +163,19 @@ final class Suggestions {
         new Genre("animation", "16", "16", "animation", "tegnefilm"),
     };
 
-    /** "HBO Max,Max|com.wbd.stream", or "drtv:DRTV|dk.dr.tvplayer" for DR's catalogue; null without a name. */
+    /**
+     * "HBO Max,Max|com.wbd.stream", or "drtv:DRTV|dk.dr.tvplayer" and "viaplay:Viaplay|com.viaplay.android" for
+     * those services' own catalogues; null without a name.
+     */
     static Service parseService(String line) {
         line = line.trim();
-        boolean drtv = line.startsWith("drtv:");
-        if (drtv) line = line.substring(5);
+        String source = FROM_TMDB;
+        for (String own : new String[] {FROM_DRTV, FROM_VIAPLAY}) {
+            if (line.startsWith(own + ":")) {
+                source = own;
+                line = line.substring(own.length() + 1);
+            }
+        }
         int bar = line.indexOf('|');
         String names = bar >= 0 ? line.substring(0, bar) : line;
         String pkg = bar >= 0 ? line.substring(bar + 1).trim() : "";
@@ -156,7 +183,7 @@ final class Suggestions {
         for (String n : names.split(",")) {
             if (!n.trim().isEmpty()) list.add(n.trim());
         }
-        return list.isEmpty() ? null : new Service(list.toArray(new String[0]), pkg, drtv);
+        return list.isEmpty() ? null : new Service(list.toArray(new String[0]), pkg, source);
     }
 
     /** Sets providerId on each service from TMDb's /watch/providers results, by id or folded name. */
@@ -288,6 +315,108 @@ final class Suggestions {
     /** DR's image URLs carry the size to scale to; theirs is 1440x2160, far more than a tile needs. */
     static String resize(String url, int width, int height) {
         return url.replaceFirst("Width=\\d+&Height=\\d+", "Width=" + width + "&Height=" + height);
+    }
+
+    static final String VIAPLAY_API = "https://content.viaplay.dk/pcdash-dk";
+
+    /** The first page of Viaplay's films or series, most popular first. */
+    static String viaplayAllUrl(boolean tv) {
+        return VIAPLAY_API + (tv ? "/serier/alle" : "/film/alle");
+    }
+
+    /** Viaplay's own genre page for a genre (from the filters its "all" page lists), or null when it has none. */
+    static String viaplayGenreUrl(JSONObject allPage, Genre genre) {
+        JSONObject links = allPage.optJSONObject("_links");
+        JSONArray filters = links != null ? links.optJSONArray("viaplay:categoryFilters") : null;
+        for (int i = 0; filters != null && i < filters.length(); i++) {
+            JSONObject f = filters.optJSONObject(i);
+            String href = f != null ? str(f, "href") : "";
+            String slug = href.substring(href.lastIndexOf('/') + 1);
+            if (href.startsWith(VIAPLAY_API) && genre.names(slug)) return href;
+        }
+        return null;
+    }
+
+    /** The product list on a Viaplay page: the first block of type "list" that has products. */
+    private static JSONObject viaplayList(JSONObject page) {
+        JSONObject embedded = page.optJSONObject("_embedded");
+        JSONArray blocks = embedded != null ? embedded.optJSONArray("viaplay:blocks") : null;
+        for (int i = 0; blocks != null && i < blocks.length(); i++) {
+            JSONObject b = blocks.optJSONObject(i);
+            if (b == null || !str(b, "type").equals("list")) continue;
+            JSONObject e = b.optJSONObject("_embedded");
+            if (e != null && e.optJSONArray("viaplay:products") != null) return b;
+        }
+        return null;
+    }
+
+    /** The next page of a Viaplay list, or null on the last one. */
+    static String viaplayNext(JSONObject page) {
+        JSONObject list = viaplayList(page);
+        JSONObject links = list != null ? list.optJSONObject("_links") : null;
+        JSONObject next = links != null ? links.optJSONObject("next") : null;
+        String href = next != null ? str(next, "href") : "";
+        return href.startsWith(VIAPLAY_API) ? href : null;
+    }
+
+    /**
+     * Films or series from a Viaplay page, only those included in the subscription now (an "svod" window around
+     * nowIso, an ISO 8601 UTC time); the rest are for rent or to buy.
+     */
+    static List<Title> parseViaplay(JSONObject page, boolean tv, String nowIso) {
+        List<Title> out = new ArrayList<>();
+        JSONObject list = viaplayList(page);
+        JSONArray products = list != null ? list.optJSONObject("_embedded").optJSONArray("viaplay:products") : null;
+        for (int i = 0; products != null && i < products.length(); i++) {
+            JSONObject p = products.optJSONObject(i);
+            if (p == null || !str(p, "type").equals(tv ? "series" : "movie")) continue;
+            JSONObject system = p.optJSONObject("system");
+            JSONObject availability = system != null ? system.optJSONObject("availability") : null;
+            JSONObject svod = availability != null ? availability.optJSONObject("svod") : null;
+            if (svod == null || str(svod, "start").compareTo(nowIso) > 0
+                    || (!str(svod, "end").isEmpty() && str(svod, "end").compareTo(nowIso) < 0)) continue;
+            JSONObject c = p.optJSONObject("content");
+            if (c == null) continue;
+            JSONObject series = c.optJSONObject("series");
+            Title t = new Title();
+            t.tv = tv;
+            t.name = tv && series != null && !str(series, "title").isEmpty() ? str(series, "title") : str(c, "title");
+            JSONObject production = c.optJSONObject("production");
+            int year = production != null ? production.optInt("year", 0) : 0;
+            t.year = year > 0 ? String.valueOf(year) : "";
+            t.overview = !str(c, "synopsis").isEmpty() || series == null ? str(c, "synopsis") : str(series, "synopsis");
+            JSONObject imdb = c.optJSONObject("imdb");
+            try {
+                t.rating = imdb != null ? Double.parseDouble(str(imdb, "rating").replace(',', '.')) : 0;
+            } catch (NumberFormatException e) {
+                t.rating = 0;
+            }
+            JSONObject images = c.optJSONObject("images");
+            if (images != null) {
+                t.poster = viaplaySize(imageUrl(images, "boxart"), 184, 276);
+                t.backdrop = viaplaySize(imageUrl(images, "landscape"), 960, 540);
+            }
+            JSONObject links = p.optJSONObject("_links");
+            JSONArray genres = links != null ? links.optJSONArray("viaplay:genres") : null;
+            for (int g = 0; genres != null && g < genres.length(); g++) {
+                JSONObject gj = genres.optJSONObject(g);
+                if (gj != null) t.tags.add(str(gj, "title").toLowerCase(Locale.ROOT));
+            }
+            String slug = str(p, "publicPath");
+            if (!slug.isEmpty() && !slug.contains("/")) t.viaplayPath = (tv ? "/serier/" : "/film/") + slug;
+            if (!t.name.isEmpty()) out.add(t);
+        }
+        return out;
+    }
+
+    private static String imageUrl(JSONObject images, String key) {
+        JSONObject i = images.optJSONObject(key);
+        return i != null ? str(i, "url") : "";
+    }
+
+    /** Viaplay's image URLs carry the size to scale to. */
+    static String viaplaySize(String url, int width, int height) {
+        return url.replaceFirst("width=\\d+&height=\\d+", "width=" + width + "&height=" + height);
     }
 
     /** One SPARQL query for the Netflix and Disney+ ids of all these titles, by their TMDb ids. */

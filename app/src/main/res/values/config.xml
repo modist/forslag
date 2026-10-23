@@ -7,16 +7,17 @@
     <!-- Your subscriptions, in the order their titles are mixed into the rows: "TMDb provider name|app package".
          Several names, comma separated, cover a renamed service; a number instead of a name is a TMDb
          provider id. A service TMDb does not know is listed in the status line at the bottom of the screen,
-         so you can fix the name. "drtv:" in front takes that service's titles from DR's own DRTV lists instead
-         (below). OK on a title opens it directly on Netflix, Disney+ and DRTV when there is a link to it, else the
-         first of its services whose app is installed. -->
+         so you can fix the name. "drtv:" or "viaplay:" in front takes that service's titles from its own catalogue
+         instead (DR's lists below; Viaplay's most popular titles included in the subscription, and its genre
+         pages). OK on a title opens it directly on Netflix, Disney+, DRTV and Viaplay when there is a link to it,
+         else the first of its services whose app is installed. -->
     <string-array name="services" translatable="false">
         <item>Netflix|com.netflix.ninja</item>
         <item>TV 2,TV 2 Play|dk.tv2.tv2playtv</item>
         <item>drtv:DRTV|dk.dr.tvplayer</item>
         <item>HBO Max,Max|com.wbd.stream</item>
         <item>Disney Plus|com.disney.disneyplus</item>
-        <item>Viaplay|com.viaplay.android</item>
+        <item>viaplay:Viaplay|com.viaplay.android</item>
         <item>YouSee Play,YouSee|dk.yousee.tv.leanback</item>
     </string-array>
 

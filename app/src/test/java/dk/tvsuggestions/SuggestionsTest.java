@@ -130,10 +130,12 @@ public class SuggestionsTest {
     @Test
     public void drtvLinesAreMarked() {
         Suggestions.Service dr = Suggestions.parseService(" drtv:DRTV|dk.dr.tvplayer");
-        assertTrue(dr.drtv);
+        assertEquals(Suggestions.FROM_DRTV, dr.source);
+        assertTrue(dr.own());
         assertArrayEquals(new String[] {"DRTV"}, dr.names);
         assertEquals("dk.dr.tvplayer", dr.pkg);
-        assertTrue(!Suggestions.parseService("Netflix|n").drtv);
+        assertTrue(!Suggestions.parseService("Netflix|n").own());
+        assertEquals(Suggestions.FROM_VIAPLAY, Suggestions.parseService("viaplay:Viaplay|v").source);
     }
 
     @Test
@@ -222,6 +224,43 @@ public class SuggestionsTest {
         assertTrue(!genre("comedy").matches(police));
         assertTrue(fun.matches(bake));
         assertEquals(1, fun.filter(Arrays.asList(police, bake)).size());
+    }
+
+    @Test
+    public void parsesViaplaySubscriptionTitlesAndFindsGenrePages() throws Exception {
+        String api = Suggestions.VIAPLAY_API;
+        JSONObject page = new JSONObject("{\"_links\":{\"viaplay:categoryFilters\":["
+                + "{\"href\":\"" + api + "/serier/alle\"},{\"href\":\"" + api + "/serier/dokumentarserier\"},"
+                + "{\"href\":\"" + api + "/serier/science-fiction\"},{\"href\":\"" + api + "/serier/underholdning\"}]},"
+                + "\"_embedded\":{\"viaplay:blocks\":[{\"type\":\"list\",\"_links\":{\"next\":{\"href\":\""
+                + api + "/serier/alle?blockId=x&partial=1&pageNumber=2\"}},\"_embedded\":{\"viaplay:products\":["
+                + "{\"type\":\"series\",\"publicPath\":\"robinson-ekspeditionen\","
+                + "\"system\":{\"availability\":{\"svod\":{\"start\":\"2026-01-01T00:00:00.000Z\",\"end\":\"2027-01-01T00:00:00.000Z\"}}},"
+                + "\"content\":{\"series\":{\"title\":\"Robinson Ekspeditionen\",\"synopsis\":\"22 deltagere\"},"
+                + "\"production\":{\"year\":2026},\"imdb\":{\"rating\":\"6,1\"},"
+                + "\"images\":{\"boxart\":{\"url\":\"https://i/x.jpg?width=199&height=298\"}}},"
+                + "\"_links\":{\"viaplay:genres\":[{\"title\":\"Reality\"},{\"title\":\"Underholdning\"}]}},"
+                + "{\"type\":\"series\",\"publicPath\":\"rental\",\"system\":{\"availability\":{}},"
+                + "\"content\":{\"title\":\"Only for rent\"}},"
+                + "{\"type\":\"movie\",\"publicPath\":\"a-film\","
+                + "\"system\":{\"availability\":{\"svod\":{\"start\":\"2026-01-01T00:00:00.000Z\"}}},"
+                + "\"content\":{\"title\":\"A film\"}}]}}]}}");
+        List<Suggestions.Title> series = Suggestions.parseViaplay(page, true, "2026-10-23T20:00:00.000Z");
+        assertEquals(1, series.size());
+        Suggestions.Title r = series.get(0);
+        assertEquals("Robinson Ekspeditionen", r.name);
+        assertEquals("2026", r.year);
+        assertEquals(6.1, r.rating, 0.001);
+        assertEquals("/serier/robinson-ekspeditionen", r.viaplayPath);
+        assertTrue(r.poster.endsWith("width=184&height=276"));
+        assertTrue(genre("entertainment").matches(r));
+        assertEquals("/film/a-film", Suggestions.parseViaplay(page, false, "2026-10-23T20:00:00.000Z").get(0).viaplayPath);
+        // Not yet in the subscription.
+        assertTrue(Suggestions.parseViaplay(page, true, "2025-12-31T00:00:00.000Z").isEmpty());
+        assertTrue(Suggestions.viaplayNext(page).endsWith("pageNumber=2"));
+        assertEquals(api + "/serier/dokumentarserier", Suggestions.viaplayGenreUrl(page, genre("documentary")));
+        assertEquals(api + "/serier/science-fiction", Suggestions.viaplayGenreUrl(page, genre("scifi")));
+        assertNull(Suggestions.viaplayGenreUrl(page, genre("animation")));
     }
 
     private static Suggestions.Genre genre(String key) {

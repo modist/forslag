@@ -24,6 +24,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.net.URLEncoder;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -295,7 +297,7 @@ public class MainActivity extends Activity {
                 }
                 List<Suggestions.Service> usable = new ArrayList<>();
                 for (Suggestions.Service s : services) {
-                    if (s.drtv || s.providerId >= 0) usable.add(s);
+                    if (s.own() || s.providerId >= 0) usable.add(s);
                     else r.unmatched.add(s.names[0]);
                 }
                 found = usable;
@@ -323,11 +325,13 @@ public class MainActivity extends Activity {
         for (Suggestions.Service s : services) {
             List<Suggestions.Title> l = new ArrayList<>();
             try {
-                if (s.drtv) {
+                if (s.source.equals(Suggestions.FROM_DRTV)) {
                     // DR's lists are not by genre; the tab keeps the titles DR tags with it.
                     l = Suggestions.parseDrtv(tmdb.open(Suggestions.drtvListUrl(
                             getString(tv ? R.string.drtv_series : R.string.drtv_movies))), tv);
                     if (genre != null) l = genre.filter(l);
+                } else if (s.source.equals(Suggestions.FROM_VIAPLAY)) {
+                    l = viaplay(tv, genre);
                 } else {
                     l = Suggestions.parseDiscover(tmdb.json(
                             Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre)), tv);
@@ -344,7 +348,7 @@ public class MainActivity extends Activity {
         int share = services.isEmpty() ? 0 : perRow / services.size() + 6;
         ExecutorService pool = Executors.newFixedThreadPool(6);
         for (int i = 0; i < lists.size(); i++) {
-            if (services.get(i).drtv) continue;
+            if (services.get(i).own()) continue;
             List<Suggestions.Title> l = lists.get(i);
             for (Suggestions.Title t : l.subList(0, Math.min(share, l.size()))) {
                 pool.execute(() -> streamsOn(t));
@@ -352,15 +356,36 @@ public class MainActivity extends Activity {
         }
         pool.shutdown();
         pool.awaitTermination(60, TimeUnit.SECONDS);
-        // DR's own lists are what DRTV has. When TMDb can't say, the title is kept: a rental now and then beats
-        // empty rows while offline.
+        // DR's and Viaplay's own lists are what they stream. When TMDb can't say, the title is kept: a rental now
+        // and then beats empty rows while offline.
         List<Suggestions.Title> mixed = Suggestions.mix(lists, services, perRow, (t, s) -> {
-            if (s.drtv) return true;
+            if (s.own()) return true;
             Set<Integer> on = streamsOn(t);
             return on == null || on.contains(s.providerId);
         });
         linkIds(mixed);
         return mixed;
+    }
+
+    /**
+     * Viaplay's most popular films or series in the subscription, from its own catalogue: its genre page where it
+     * has one for the genre, else its "all" pages filtered by each title's genres. A few pages, about 30 titles.
+     */
+    private List<Suggestions.Title> viaplay(boolean tv, Suggestions.Genre genre) throws Exception {
+        JSONObject all = tmdb.open(Suggestions.viaplayAllUrl(tv));
+        String url = genre == null ? null : Suggestions.viaplayGenreUrl(all, genre);
+        JSONObject page = genre == null || url == null ? all : tmdb.open(url);
+        SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT);
+        iso.setTimeZone(TimeZone.getTimeZone("UTC"));
+        String now = iso.format(new Date());
+        List<Suggestions.Title> out = new ArrayList<>();
+        for (int pages = 1; ; pages++) {
+            List<Suggestions.Title> got = Suggestions.parseViaplay(page, tv, now);
+            out.addAll(genre != null && url == null ? genre.filter(got) : got);
+            String next = Suggestions.viaplayNext(page);
+            if (next == null || pages >= 3 || out.size() >= perRow) return out;
+            page = tmdb.open(next);
+        }
     }
 
     /**
@@ -535,8 +560,8 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Opens the title in the first of its services that has a link to it (Netflix, Disney+, DRTV), else the first
-     * installed app at its home screen.
+     * Opens the title in the first of its services that has a link to it (Netflix, Disney+, DRTV, Viaplay), else
+     * the first installed app at its home screen.
      */
     private void open(Suggestions.Title t) {
         PackageManager pm = getPackageManager();
@@ -571,6 +596,8 @@ public class MainActivity extends Activity {
             url = "https://www.disneyplus.com/" + (t.tv ? "series/" : "movies/") + Suggestions.slug(t.name) + "/" + t.disneyId;
         } else if (s.pkg.equals(Suggestions.DRTV) && !t.drPath.isEmpty()) {
             url = "https://www.dr.dk/drtv" + t.drPath;
+        } else if (s.pkg.equals(Suggestions.VIAPLAY) && !t.viaplayPath.isEmpty()) {
+            url = "https://viaplay.dk" + t.viaplayPath;
         } else {
             return null;
         }
