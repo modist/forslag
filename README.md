@@ -1,7 +1,10 @@
 # Forslag
 
 An Android TV app that shows what is included in your own streaming subscriptions right now: a row of
-movies and a row of series, most popular first, mixed from each service in turn. Focus a title to see its
+movies and a row of series, most popular first, mixed from each service in turn. Each row has genre tabs
+above it (All, Drama, Comedy, Crime, Action, Sci-fi & fantasy, Documentary, Entertainment for series, Family &
+kids, Animation): rest the focus on a tab, or press OK on it, and the row shows that genre. A genre is fetched
+the first time it is chosen and kept like the rest. Focus a title to see its
 year, rating, plot and which of your services has it; press OK to open it. Netflix, Disney+ and DRTV open the
 title itself where there is a link to it; the other services open at their home screen.
 
@@ -70,6 +73,8 @@ time sends nothing. When TMDb can't be reached, the last answers are shown.
   load sends about 150 small requests and takes 15 to 30 seconds; after that the cache answers.
 - Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles popular elsewhere but
   unknown here.
+- DRTV's lists are not by genre, so a genre tab keeps the DR titles DR tags with it (categories for series,
+  keywords for films); in the narrower genres there are few.
 - DRTV's API is DR's own but undocumented and unofficial; it can change without notice. If it fails, the rows
   simply have no DRTV titles. The lists are `drtv_movies` and `drtv_series` in `config.xml`.
 - OK opens the title itself on Netflix and Disney+ only when Wikidata has the service's id for it, which is most

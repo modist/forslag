@@ -12,5 +12,16 @@
     <string name="unmatched">Not on TMDb: %1$s</string>
     <string name="updated">Updated %1$s</string>
     <string name="not_installed">%1$s is not installed</string>
+    <string name="empty_genre">Nothing in this genre on your services right now.</string>
+    <string name="genre_all">All</string>
+    <string name="genre_drama">Drama</string>
+    <string name="genre_comedy">Comedy</string>
+    <string name="genre_crime">Crime</string>
+    <string name="genre_action">Action</string>
+    <string name="genre_scifi">Sci-fi &amp; fantasy</string>
+    <string name="genre_documentary">Documentary</string>
+    <string name="genre_entertainment">Entertainment</string>
+    <string name="genre_family">Family &amp; kids</string>
+    <string name="genre_animation">Animation</string>
     <string name="attribution" translatable="false">This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming data: JustWatch.</string>
 </resources>

@@ -3,6 +3,7 @@ package dk.tvsuggestions;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -28,8 +29,9 @@ import java.io.File;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,26 +43,150 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * What is included in your streaming subscriptions right now, from TMDb's discover API (catalogue data by
- * JustWatch) and DR's own DRTV lists: a row of movies and a row of series, with the services in
- * res/values/config.xml. Only the region, the language and the provider ids go to TMDb, with the key; Wikidata gets
- * the TMDb ids of the titles on Netflix and Disney+. OK opens the title in its app where there is a link to it.
+ * JustWatch) and DR's own DRTV lists: a row of movies and a row of series, each with genre tabs, with the services
+ * in res/values/config.xml. Only the region, the language, the genre and the provider ids go to TMDb, with the key;
+ * Wikidata gets the TMDb ids of the titles on Netflix and Disney+. OK opens the title in its app where there is a
+ * link to it.
  */
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
     private static final long BACKDROP_DELAY_MS = 300;
+    /** A genre tab is chosen once the focus has rested on it this long, or at once with OK. */
+    private static final long TAB_DELAY_MS = 450;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private int accent;
     private Tmdb tmdb;
     private Images images;
     private ImageView backdrop;
-    private TextView title, meta, overview, status, moviesLabel, seriesLabel;
-    private LinearLayout movies, series;
+    private TextView title, meta, overview, status;
+    private Section movies, series;
+    private String region, language;
+    private int perRow, minVotes;
     private boolean loading;
     /** When the rows were last filled; they are kept as they are (and the focus with them) until the cache is stale. */
     private long loadedAt;
+    /** The services TMDb or DRTV can give titles for; set by the first load, read by the genre tabs. */
+    private volatile List<Suggestions.Service> found = Collections.emptyList();
+    private final Map<String, Set<Integer>> streams = new ConcurrentHashMap<>();
     private String pendingBackdrop = "";
     private final Runnable showBackdrop = () -> images.load(backdrop, pendingBackdrop);
+
+    /** The movie or series row: its genre tabs, its tiles, and the rows already fetched, by genre. */
+    private final class Section {
+        final boolean tv;
+        final LinearLayout row;
+        final List<TextView> tabs = new ArrayList<>();
+        final Map<String, List<Suggestions.Title>> fetched = new HashMap<>();
+        Suggestions.Genre genre;
+        /** Bumped on every choice, so a slow answer for a tab that was left is dropped. */
+        int generation;
+        Runnable pending;
+
+        Section(LinearLayout col, boolean tv, int label) {
+            this.tv = tv;
+            LinearLayout head = new LinearLayout(MainActivity.this);
+            head.setOrientation(LinearLayout.HORIZONTAL);
+            head.setGravity(Gravity.CENTER_VERTICAL);
+            head.setPadding(0, dp(8), 0, dp(2));
+            TextView name = text(16, Typeface.BOLD, 0xE6FFFFFF);
+            name.setText(label);
+            name.setPadding(0, 0, dp(16), 0);
+            head.addView(name);
+            HorizontalScrollView scroll = new HorizontalScrollView(MainActivity.this);
+            scroll.setHorizontalScrollBarEnabled(false);
+            LinearLayout strip = new LinearLayout(MainActivity.this);
+            strip.setOrientation(LinearLayout.HORIZONTAL);
+            scroll.addView(strip);
+            head.addView(scroll, new LinearLayout.LayoutParams(0, -2, 1f));
+            strip.addView(tab(null));
+            for (Suggestions.Genre g : Suggestions.GENRES) {
+                if (g.offered(tv)) strip.addView(tab(g));
+            }
+            col.addView(head);
+            row = row(col);
+            mark();
+        }
+
+        private TextView tab(Suggestions.Genre g) {
+            TextView t = text(13, Typeface.NORMAL, 0xFFFFFFFF);
+            t.setText(g == null ? R.string.genre_all : genreLabel(g));
+            t.setPadding(dp(12), dp(4), dp(12), dp(4));
+            t.setBackground(tabBackground());
+            t.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_selected}, {}},
+                    new int[] {0xFF15171C, 0xFFFFFFFF}));
+            // Usable once the first load knows the services.
+            t.setFocusable(false);
+            t.setTag(g);
+            t.setOnFocusChangeListener((v, focused) -> {
+                if (pending != null) main.removeCallbacks(pending);
+                pending = null;
+                if (focused) {
+                    pending = () -> choose(g);
+                    main.postDelayed(pending, TAB_DELAY_MS);
+                }
+            });
+            t.setOnClickListener(v -> choose(g));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.setMargins(0, 0, dp(6), 0);
+            t.setLayoutParams(lp);
+            tabs.add(t);
+            return t;
+        }
+
+        void enableTabs() {
+            for (TextView t : tabs) t.setFocusable(true);
+        }
+
+        void mark() {
+            for (TextView t : tabs) t.setSelected(t.getTag() == genre);
+        }
+
+        void reset() {
+            fetched.clear();
+            genre = null;
+            generation++;
+            mark();
+        }
+
+        void choose(Suggestions.Genre g) {
+            if (pending != null) main.removeCallbacks(pending);
+            pending = null;
+            if (g == genre && fetched.containsKey(key(g))) return;
+            genre = g;
+            mark();
+            List<Suggestions.Title> known = fetched.get(key(g));
+            if (known != null) {
+                fill(this, known);
+                return;
+            }
+            final int asked = ++generation;
+            placeholder(this, R.string.loading);
+            new Thread(() -> {
+                List<Suggestions.Title> titles;
+                try {
+                    titles = buildRow(tv, g);
+                } catch (Exception e) {
+                    Log.w(TAG, "genre " + key(g) + ": " + e);
+                    titles = null;
+                }
+                final List<Suggestions.Title> result = titles;
+                main.post(() -> {
+                    if (asked != generation || isDestroyed()) return;
+                    if (result == null) {
+                        placeholder(this, R.string.offline);
+                        return;
+                    }
+                    fetched.put(key(g), result);
+                    fill(this, result);
+                });
+            }).start();
+        }
+    }
+
+    private static String key(Suggestions.Genre g) {
+        return g == null ? "all" : g.key;
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -68,6 +194,10 @@ public class MainActivity extends Activity {
         accent = getColor(R.color.accent);
         tmdb = new Tmdb(BuildConfig.TMDB_KEY, new File(getCacheDir(), "tmdb"), getResources().getInteger(R.integer.cache_hours));
         images = new Images(tmdb);
+        region = getString(R.string.region);
+        language = getString(R.string.language);
+        perRow = getResources().getInteger(R.integer.per_row);
+        minVotes = getResources().getInteger(R.integer.min_votes);
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
@@ -94,7 +224,7 @@ public class MainActivity extends Activity {
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
-        col.addView(header, new LinearLayout.LayoutParams(-1, dp(116)));
+        col.addView(header, new LinearLayout.LayoutParams(-1, dp(112)));
         title = oneLine(text(30, Typeface.BOLD, 0xFFFFFFFF));
         header.addView(title);
         meta = oneLine(text(15, Typeface.NORMAL, accent));
@@ -106,10 +236,8 @@ public class MainActivity extends Activity {
         overview.setLineSpacing(0, 1.15f);
         header.addView(overview, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.6f), -2));
 
-        moviesLabel = rowLabel(col, R.string.movies);
-        movies = row(col);
-        seriesLabel = rowLabel(col, R.string.series);
-        series = row(col);
+        movies = new Section(col, false, R.string.movies);
+        series = new Section(col, true, R.string.series);
 
         View spacer = new View(this);
         col.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -152,10 +280,6 @@ public class MainActivity extends Activity {
             return;
         }
         loading = true;
-        String region = getString(R.string.region);
-        String language = getString(R.string.language);
-        int perRow = getResources().getInteger(R.integer.per_row);
-        int minVotes = getResources().getInteger(R.integer.min_votes);
         List<Suggestions.Service> services = new ArrayList<>();
         for (String line : getResources().getStringArray(R.array.services)) {
             Suggestions.Service s = Suggestions.parseService(line);
@@ -169,55 +293,15 @@ public class MainActivity extends Activity {
                     JSONArray providers = tmdb.json(Suggestions.providersPath(tv, region, language)).optJSONArray("results");
                     if (providers != null) Suggestions.match(services, providers);
                 }
-                List<Suggestions.Service> found = new ArrayList<>();
+                List<Suggestions.Service> usable = new ArrayList<>();
                 for (Suggestions.Service s : services) {
-                    if (s.drtv || s.providerId >= 0) found.add(s);
+                    if (s.drtv || s.providerId >= 0) usable.add(s);
                     else r.unmatched.add(s.names[0]);
                 }
-                Map<String, Set<Integer>> streams = new ConcurrentHashMap<>();
-                // DR's own lists are what DRTV has. When TMDb can't say, the title is kept: a rental now and then
-                // beats empty rows while offline.
-                Suggestions.Check check = (t, s) -> {
-                    if (s.drtv) return true;
-                    Set<Integer> on = streamsOn(t, region, streams);
-                    return on == null || on.contains(s.providerId);
-                };
-                for (boolean tv : new boolean[] {false, true}) {
-                    List<List<Suggestions.Title>> lists = new ArrayList<>();
-                    for (Suggestions.Service s : found) {
-                        List<Suggestions.Title> l = new ArrayList<>();
-                        try {
-                            l = s.drtv
-                                    ? Suggestions.parseDrtv(tmdb.open(Suggestions.drtvListUrl(
-                                            getString(tv ? R.string.drtv_series : R.string.drtv_movies))), tv)
-                                    : Suggestions.parseDiscover(tmdb.json(
-                                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes)), tv);
-                        } catch (Tmdb.KeyRefused e) {
-                            throw e;
-                        } catch (Exception e) {
-                            Log.w(TAG, "list " + s.label() + ": " + e);
-                        }
-                        lists.add(l);
-                    }
-                    // Each service's share of the row, plus a few for titles that turn out to be rentals, checked
-                    // in parallel; any further title is checked when mix reaches it.
-                    int share = found.isEmpty() ? 0 : perRow / found.size() + 6;
-                    ExecutorService pool = Executors.newFixedThreadPool(6);
-                    for (int i = 0; i < lists.size(); i++) {
-                        if (found.get(i).drtv) continue;
-                        List<Suggestions.Title> l = lists.get(i);
-                        for (Suggestions.Title t : l.subList(0, Math.min(share, l.size()))) {
-                            pool.execute(() -> streamsOn(t, region, streams));
-                        }
-                    }
-                    pool.shutdown();
-                    pool.awaitTermination(60, TimeUnit.SECONDS);
-                    List<Suggestions.Title> mixed = Suggestions.mix(lists, found, perRow, check);
-                    if (tv) r.series = mixed;
-                    else r.movies = mixed;
-                }
-                linkIds(r);
-                if (found.isEmpty()) r.error = R.string.no_services;
+                found = usable;
+                r.movies = buildRow(false, null);
+                r.series = buildRow(true, null);
+                if (usable.isEmpty()) r.error = R.string.no_services;
                 else if (r.movies.isEmpty() && r.series.isEmpty()) r.error = R.string.nothing;
             } catch (Tmdb.KeyRefused e) {
                 r.error = R.string.bad_key;
@@ -230,18 +314,66 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Netflix and Disney+ ids from Wikidata for the titles on those services, so OK can open the title itself.
-     * One query for both rows; without an answer OK opens the app.
+     * One row: each service's titles (of one genre, or all), mixed in turns, with the TMDb titles checked against
+     * what each service really streams, and links looked up. Runs off the main thread.
      */
-    private void linkIds(Result r) {
+    private List<Suggestions.Title> buildRow(boolean tv, Suggestions.Genre genre) throws Exception {
+        List<Suggestions.Service> services = found;
+        List<List<Suggestions.Title>> lists = new ArrayList<>();
+        for (Suggestions.Service s : services) {
+            List<Suggestions.Title> l = new ArrayList<>();
+            try {
+                if (s.drtv) {
+                    // DR's lists are not by genre; the tab keeps the titles DR tags with it.
+                    l = Suggestions.parseDrtv(tmdb.open(Suggestions.drtvListUrl(
+                            getString(tv ? R.string.drtv_series : R.string.drtv_movies))), tv);
+                    if (genre != null) l = genre.filter(l);
+                } else {
+                    l = Suggestions.parseDiscover(tmdb.json(
+                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre)), tv);
+                }
+            } catch (Tmdb.KeyRefused e) {
+                throw e;
+            } catch (Exception e) {
+                Log.w(TAG, "list " + s.label() + ": " + e);
+            }
+            lists.add(l);
+        }
+        // Each service's share of the row, plus a few for titles that turn out to be rentals, checked in parallel;
+        // any further title is checked when mix reaches it.
+        int share = services.isEmpty() ? 0 : perRow / services.size() + 6;
+        ExecutorService pool = Executors.newFixedThreadPool(6);
+        for (int i = 0; i < lists.size(); i++) {
+            if (services.get(i).drtv) continue;
+            List<Suggestions.Title> l = lists.get(i);
+            for (Suggestions.Title t : l.subList(0, Math.min(share, l.size()))) {
+                pool.execute(() -> streamsOn(t));
+            }
+        }
+        pool.shutdown();
+        pool.awaitTermination(60, TimeUnit.SECONDS);
+        // DR's own lists are what DRTV has. When TMDb can't say, the title is kept: a rental now and then beats
+        // empty rows while offline.
+        List<Suggestions.Title> mixed = Suggestions.mix(lists, services, perRow, (t, s) -> {
+            if (s.drtv) return true;
+            Set<Integer> on = streamsOn(t);
+            return on == null || on.contains(s.providerId);
+        });
+        linkIds(mixed);
+        return mixed;
+    }
+
+    /**
+     * Netflix and Disney+ ids from Wikidata for the titles on those services, so OK can open the title itself.
+     * One query per row; without an answer OK opens the app.
+     */
+    private void linkIds(List<Suggestions.Title> row) {
         List<Suggestions.Title> wanted = new ArrayList<>();
-        for (List<Suggestions.Title> row : Arrays.asList(r.movies, r.series)) {
-            for (Suggestions.Title t : row) {
-                for (Suggestions.Service s : t.services) {
-                    if (t.id > 0 && (s.pkg.equals(Suggestions.NETFLIX) || s.pkg.equals(Suggestions.DISNEY))) {
-                        wanted.add(t);
-                        break;
-                    }
+        for (Suggestions.Title t : row) {
+            for (Suggestions.Service s : t.services) {
+                if (t.id > 0 && (s.pkg.equals(Suggestions.NETFLIX) || s.pkg.equals(Suggestions.DISNEY))) {
+                    wanted.add(t);
+                    break;
                 }
             }
         }
@@ -255,13 +387,13 @@ public class MainActivity extends Activity {
     }
 
     /** The providers that include t in a subscription here, or null when TMDb can't say. */
-    private Set<Integer> streamsOn(Suggestions.Title t, String region, Map<String, Set<Integer>> known) {
+    private Set<Integer> streamsOn(Suggestions.Title t) {
         String key = (t.tv ? "tv" : "movie") + t.id;
-        Set<Integer> hit = known.get(key);
+        Set<Integer> hit = streams.get(key);
         if (hit != null) return hit;
         try {
             Set<Integer> ids = Suggestions.flatrate(tmdb.json(Suggestions.watchPath(t)), region);
-            known.put(key, ids);
+            streams.put(key, ids);
             return ids;
         } catch (Exception e) {
             Log.w(TAG, "watch providers " + key + ": " + e);
@@ -274,9 +406,13 @@ public class MainActivity extends Activity {
         boolean any = !r.movies.isEmpty() || !r.series.isEmpty();
         if (any) {
             loadedAt = System.currentTimeMillis();
-            fill(movies, moviesLabel, r.movies);
-            fill(series, seriesLabel, r.series);
-            View first = movies.getChildCount() > 0 ? movies.getChildAt(0) : series.getChildAt(0);
+            for (Section s : new Section[] {movies, series}) {
+                s.reset();
+                s.fetched.put(key(null), s.tv ? r.series : r.movies);
+                fill(s, s.tv ? r.series : r.movies);
+                s.enableTabs();
+            }
+            View first = movies.row.getChildCount() > 0 ? movies.row.getChildAt(0) : series.row.getChildAt(0);
             if (first != null) first.requestFocus();
         }
         StringBuilder line = new StringBuilder(r.error != 0 ? getString(r.error)
@@ -285,12 +421,55 @@ public class MainActivity extends Activity {
         status.setText(line);
     }
 
-    private void fill(LinearLayout row, TextView label, List<Suggestions.Title> titles) {
-        row.removeAllViews();
-        int visible = titles.isEmpty() ? View.GONE : View.VISIBLE;
-        label.setVisibility(visible);
-        ((View) row.getParent()).setVisibility(visible);
-        for (Suggestions.Title t : titles) row.addView(tile(t));
+    private void fill(Section s, List<Suggestions.Title> titles) {
+        if (titles.isEmpty()) {
+            placeholder(s, R.string.empty_genre);
+            return;
+        }
+        s.row.removeAllViews();
+        for (Suggestions.Title t : titles) s.row.addView(tile(t));
+        ((HorizontalScrollView) s.row.getParent()).scrollTo(0, 0);
+    }
+
+    /** A line of text in place of the tiles, as tall as they are, so the screen does not jump. */
+    private void placeholder(Section s, int text) {
+        s.row.removeAllViews();
+        TextView t = text(14, Typeface.NORMAL, 0x99FFFFFF);
+        t.setText(text);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        s.row.addView(t, new LinearLayout.LayoutParams(-2, dp(135)));
+    }
+
+    private int genreLabel(Suggestions.Genre g) {
+        switch (g.key) {
+            case "drama": return R.string.genre_drama;
+            case "comedy": return R.string.genre_comedy;
+            case "crime": return R.string.genre_crime;
+            case "action": return R.string.genre_action;
+            case "scifi": return R.string.genre_scifi;
+            case "documentary": return R.string.genre_documentary;
+            case "entertainment": return R.string.genre_entertainment;
+            case "family": return R.string.genre_family;
+            default: return R.string.genre_animation;
+        }
+    }
+
+    /** Selected: filled with the accent. Focused: outlined. */
+    private StateListDrawable tabBackground() {
+        StateListDrawable d = new StateListDrawable();
+        d.addState(new int[] {android.R.attr.state_selected, android.R.attr.state_focused}, pill(accent, 0xFFFFFFFF));
+        d.addState(new int[] {android.R.attr.state_focused}, pill(0x40FFFFFF, 0xFFFFFFFF));
+        d.addState(new int[] {android.R.attr.state_selected}, pill(accent, 0));
+        d.addState(new int[] {}, pill(0x1FFFFFFF, 0));
+        return d;
+    }
+
+    private GradientDrawable pill(int fill, int stroke) {
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius(dp(14));
+        g.setColor(fill);
+        if (stroke != 0) g.setStroke(dp(2), stroke);
+        return g;
     }
 
     private View tile(Suggestions.Title t) {
@@ -400,14 +579,6 @@ public class MainActivity extends Activity {
         // Netflix opens the title only when it is told where the link came from.
         if (s.pkg.equals(Suggestions.NETFLIX)) i.putExtra("source", "30");
         return i;
-    }
-
-    private TextView rowLabel(LinearLayout col, int text) {
-        TextView t = text(16, Typeface.BOLD, 0xE6FFFFFF);
-        t.setText(text);
-        t.setPadding(0, dp(8), 0, dp(2));
-        col.addView(t);
-        return t;
     }
 
     private LinearLayout row(LinearLayout col) {

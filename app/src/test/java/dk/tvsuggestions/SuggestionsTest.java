@@ -89,7 +89,7 @@ public class SuggestionsTest {
 
     @Test
     public void discoverAsksForSubscriptionTitlesInTheRegion() {
-        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50);
+        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null);
         assertTrue(p.startsWith("/discover/tv?"));
         assertTrue(p.contains("watch_region=DK"));
         assertTrue(p.contains("with_watch_providers=8"));
@@ -195,6 +195,38 @@ public class SuggestionsTest {
         assertEquals("abc", show.disneyId);
         assertEquals("", other.netflixId);
         assertEquals("what-we-do-in-the-shadows", Suggestions.slug("What We Do in the Shadows"));
+    }
+
+    @Test
+    public void genresMatchTmdbIdsAndDrWords() throws Exception {
+        Suggestions.Genre crime = genre("crime");
+        Suggestions.Genre fun = genre("entertainment");
+        assertTrue(!fun.offered(false));
+        assertTrue(fun.offered(true));
+        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, crime).contains("&with_genres=80%7C53"));
+        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, crime).contains("&with_genres=80%7C9648"));
+
+        JSONObject tmdb = new JSONObject("{\"results\":[{\"id\":1,\"title\":\"Heat\",\"genre_ids\":[28,53]}]}");
+        Suggestions.Title heat = Suggestions.parseDiscover(tmdb, false).get(0);
+        assertTrue(crime.matches(heat));
+        assertTrue(!genre("comedy").matches(heat));
+
+        JSONObject dr = new JSONObject("{\"items\":["
+                + "{\"type\":\"program\",\"title\":\"Police\",\"path\":\"/program/police_1\","
+                + "\"keywords\":[\"editorialptaxtop_film\",\"editorialptaxsub_thriller/krimi\",\"mood_sjovt\"]},"
+                + "{\"type\":\"show\",\"title\":\"Bagedysten\",\"path\":\"/serie/bagedysten_2\","
+                + "\"categories\":[\"dr1\",\"underholdning\"]}]}");
+        Suggestions.Title police = Suggestions.parseDrtv(dr, false).get(0);
+        Suggestions.Title bake = Suggestions.parseDrtv(dr, true).get(0);
+        assertTrue(crime.matches(police));
+        assertTrue(!genre("comedy").matches(police));
+        assertTrue(fun.matches(bake));
+        assertEquals(1, fun.filter(Arrays.asList(police, bake)).size());
+    }
+
+    private static Suggestions.Genre genre(String key) {
+        for (Suggestions.Genre g : Suggestions.GENRES) if (g.key.equals(key)) return g;
+        throw new AssertionError(key);
     }
 
     private static Suggestions.Title title(int id) {

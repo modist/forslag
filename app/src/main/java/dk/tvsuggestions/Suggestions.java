@@ -5,6 +5,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,6 +57,9 @@ final class Suggestions {
         /** What the apps open a title by: Netflix and Disney+ ids from Wikidata, DRTV's own path. */
         String netflixId = "", disneyId = "", drPath = "";
         final List<Service> services = new ArrayList<>();
+        /** TMDb's genre ids, and DR's genre words (lower case), for the genre tabs. */
+        final Set<Integer> genres = new HashSet<>();
+        final Set<String> tags = new HashSet<>();
 
         /** Fills in what this title lacks from the same title found on another service. */
         void absorb(Title o) {
@@ -66,6 +70,8 @@ final class Suggestions {
             if (poster.isEmpty()) poster = o.poster;
             if (backdrop.isEmpty()) backdrop = o.backdrop;
             if (drPath.isEmpty()) drPath = o.drPath;
+            genres.addAll(o.genres);
+            tags.addAll(o.tags);
         }
 
         /** The same title: same kind and folded name, and the same year where both have one. */
@@ -84,6 +90,59 @@ final class Suggestions {
         }
         return b.toString();
     }
+
+    /**
+     * One genre tab: TMDb's genre ids for movies and for series ("" where the genre is not offered, ids joined
+     * with | for "any of"), and the words DR uses in its categories and keywords.
+     */
+    static final class Genre {
+        final String key, movieIds, tvIds;
+        final String[] drWords;
+
+        Genre(String key, String movieIds, String tvIds, String... drWords) {
+            this.key = key;
+            this.movieIds = movieIds;
+            this.tvIds = tvIds;
+            this.drWords = drWords;
+        }
+
+        boolean offered(boolean tv) {
+            return !(tv ? tvIds : movieIds).isEmpty();
+        }
+
+        boolean matches(Title t) {
+            for (String id : (t.tv ? tvIds : movieIds).split("\\|")) {
+                if (!id.isEmpty() && t.genres.contains(Integer.parseInt(id))) return true;
+            }
+            for (String tag : t.tags) {
+                for (String w : drWords) {
+                    if (tag.contains(w)) return true;
+                }
+            }
+            return false;
+        }
+
+        List<Title> filter(List<Title> titles) {
+            List<Title> out = new ArrayList<>();
+            for (Title t : titles) {
+                if (matches(t)) out.add(t);
+            }
+            return out;
+        }
+    }
+
+    /** The tabs after "All", in order. TMDb's ids: https://developer.themoviedb.org/reference/genre-movie-list */
+    static final Genre[] GENRES = {
+        new Genre("drama", "18", "18", "drama"),
+        new Genre("comedy", "35", "35", "humor", "komedie", "satire"),
+        new Genre("crime", "80|53", "80|9648", "krimi", "thriller"),
+        new Genre("action", "28|12", "10759", "action", "eventyr"),
+        new Genre("scifi", "878|14", "10765", "sci-fi", "science fiction", "fantasy"),
+        new Genre("documentary", "99", "99", "dokumentar"),
+        new Genre("entertainment", "", "10764|10767", "underholdning", "reality", "quiz"),
+        new Genre("family", "10751", "10751|10762", "familie", "boern", "b\u00f8rn", "ramasjang"),
+        new Genre("animation", "16", "16", "animation", "tegnefilm"),
+    };
 
     /** "HBO Max,Max|com.wbd.stream", or "drtv:DRTV|dk.dr.tvplayer" for DR's catalogue; null without a name. */
     static Service parseService(String line) {
@@ -124,10 +183,11 @@ final class Suggestions {
     }
 
     /** What is included in one subscription in one country, most popular first. */
-    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes) {
+    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes, Genre genre) {
+        String genres = genre == null ? "" : "&with_genres=" + (tv ? genre.tvIds : genre.movieIds).replace("|", "%7C");
         return "/discover/" + (tv ? "tv" : "movie") + "?watch_region=" + region + "&with_watch_providers="
                 + providerId + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&include_adult=false"
-                + "&vote_count.gte=" + minVotes + "&language=" + language + "&page=1";
+                + "&vote_count.gte=" + minVotes + genres + "&language=" + language + "&page=1";
     }
 
     /** Where one title can be watched, in every country. */
@@ -171,6 +231,8 @@ final class Suggestions {
             t.poster = poster.isEmpty() ? "" : TMDB_IMAGES + "w185" + poster;
             t.backdrop = backdrop.isEmpty() ? "" : TMDB_IMAGES + "w780" + backdrop;
             t.rating = r.optDouble("vote_average", 0);
+            JSONArray genres = r.optJSONArray("genre_ids");
+            for (int g = 0; genres != null && g < genres.length(); g++) t.genres.add(genres.optInt(g));
             if (!t.name.isEmpty()) out.add(t);
         }
         return out;
@@ -202,6 +264,17 @@ final class Suggestions {
             t.year = r.optInt("releaseYear", 0) > 0 ? String.valueOf(r.optInt("releaseYear")) : "";
             t.overview = str(r, "shortDescription");
             t.drPath = str(r, "path");
+            // Series carry categories ("dokumentar", "underholdning", "krimi"), films only keywords
+            // ("editorialptaxsub_thriller/krimi").
+            JSONArray categories = r.optJSONArray("categories");
+            for (int c = 0; categories != null && c < categories.length(); c++) {
+                t.tags.add(categories.optString(c, "").toLowerCase(Locale.ROOT));
+            }
+            JSONArray keywords = r.optJSONArray("keywords");
+            for (int k = 0; keywords != null && k < keywords.length(); k++) {
+                String w = keywords.optString(k, "").toLowerCase(Locale.ROOT);
+                if (w.startsWith("editorialptax")) t.tags.add(w.substring(w.indexOf('_') + 1));
+            }
             JSONObject images = r.optJSONObject("images");
             if (images != null) {
                 t.poster = resize(str(images, "poster"), 184, 276);
