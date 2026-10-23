@@ -1,4 +1,4 @@
-package dk.tvsuggestions;
+package net.steensgaard.forslag;
 
 import org.json.JSONArray;
 import org.json.JSONObject;

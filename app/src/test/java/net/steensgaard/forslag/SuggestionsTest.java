@@ -1,4 +1,4 @@
-package dk.tvsuggestions;
+package net.steensgaard.forslag;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;

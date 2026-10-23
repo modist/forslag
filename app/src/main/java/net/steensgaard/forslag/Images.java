@@ -1,4 +1,4 @@
-package dk.tvsuggestions;
+package net.steensgaard.forslag;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;

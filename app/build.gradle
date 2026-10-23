@@ -9,11 +9,11 @@ if (localFile.exists()) localFile.withInputStream { local.load(it) }
 def tmdbKey = local.getProperty('tmdb.key') ?: System.getenv('TMDB_KEY') ?: ''
 
 android {
-    namespace 'dk.tvsuggestions'
+    namespace 'net.steensgaard.forslag'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'dk.tvsuggestions'
+        applicationId 'net.steensgaard.forslag'
         minSdk 26
         targetSdk 34
         versionCode 1

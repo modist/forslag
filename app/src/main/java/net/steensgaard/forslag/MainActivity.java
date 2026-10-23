@@ -1,4 +1,4 @@
-package dk.tvsuggestions;
+package net.steensgaard.forslag;
 
 import android.app.Activity;
 import android.content.Intent;
