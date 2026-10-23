@@ -70,7 +70,7 @@ time sends nothing. When TMDb can't be reached, the last answers are shown.
 
 - TMDb's subscription filter also lets through titles a service only rents or sells (on Viaplay, 18 of the top
   20 "subscription" movies were rentals), so each title's availability is checked before it is shown. The first
-  load sends about 150 small requests and takes 15 to 30 seconds; after that the cache answers.
+  load sends about 150 small requests and took about 50 seconds on the Philips; after that the cache answers.
 - Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles popular elsewhere but
   unknown here.
 - DRTV's lists are not by genre, so a genre tab keeps the DR titles DR tags with it (categories for series,
@@ -87,4 +87,6 @@ time sends nothing. When TMDb can't be reached, the last answers are shown.
 ## Tested on
 
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: rows, posters,
-D-pad, OK into HBO Max, and the module card.
+D-pad, genre tabs (Comedy movies, Crime series), the module card, OK into HBO Max (home screen), and OK straight
+to the title on DRTV (Moedregruppen) and on Netflix while it was already running (Breaking Bad). Disney+ opened
+the title from a hand-sent link of the same form.
