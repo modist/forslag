@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="movies">Film</string>
+    <string name="series">Serier</string>
+    <string name="loading">Henter…</string>
+    <string name="no_key">Der er ingen TMDb-nøgle i denne build. Skriv tmdb.key=… i local.properties og byg igen.</string>
+    <string name="bad_key">TMDb afviste nøglen. Tjek tmdb.key i local.properties.</string>
+    <string name="offline">Kan ikke få forbindelse til TMDb.</string>
+    <string name="nothing">TMDb har ingen titler for disse tjenester.</string>
+    <string name="no_services">Ingen af dine tjenester blev fundet på TMDb.</string>
+    <string name="unmatched">Ikke på TMDb: %1$s</string>
+    <string name="updated">Opdateret %1$s</string>
+    <string name="not_installed">%1$s er ikke installeret</string>
+</resources>

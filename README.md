@@ -1,0 +1,71 @@
+# Forslag
+
+An Android TV app that shows what is included in your own streaming subscriptions right now: a row of
+movies and a row of series, most popular first, mixed from each service in turn. Focus a title to see its
+year, rating, plot and which of your services has it; press OK to open that service's app.
+
+It declares a module card for the [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher
+(label **Forslag**, caption *Film og serier*), so it can sit in the dock. It works as an ordinary app on
+any Android TV as well.
+
+The data comes from [TMDb](https://www.themoviedb.org/), whose streaming availability comes from
+JustWatch. This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+## Set up
+
+1. Make a free TMDb account and ask for an API key: <https://www.themoviedb.org/settings/api>. Either
+   the v3 "API Key" or the v4 "API Read Access Token" works.
+2. Put it in `local.properties` in this folder (git ignores that file, so the key stays out of the repo):
+
+   ```properties
+   sdk.dir=C:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
+   tmdb.key=<your key>
+   ```
+
+   Or set `TMDB_KEY` in the environment when you build.
+3. Pick your services in [`app/src/main/res/values/config.xml`](app/src/main/res/values/config.xml):
+   one line per subscription, `TMDb provider name|app package`. Several names, separated by commas, cover a
+   service that was renamed (`HBO Max,Max`). A number is read as a TMDb provider id. A service TMDb doesn't
+   know is named in the status line at the bottom of the screen, so you can correct it. Region (`DK`) and
+   language (`da-DK`) are set in the same file.
+
+## Build and install
+
+JDK 17 and Android SDK 34, as for the launcher:
+
+```bash
+./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+```
+
+With the Clean Your TV tools:
+
+```bash
+TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py --push app/build/outputs/apk/release/app-release.apk /data/local/tmp/forslag.apk
+TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'pm install -r /data/local/tmp/forslag.apk; rm -f /data/local/tmp/forslag.apk'
+```
+
+Press Home. The launcher asks once whether to show the card; answer Show card.
+
+The release build is signed with the debug key, like the launcher. The TMDb key is compiled into the APK,
+so keep the APK to yourself.
+
+## Permissions
+
+| Permission | Why |
+|---|---|
+| `INTERNET` | Fetches lists from `api.themoviedb.org` and posters from `image.tmdb.org`. Each request sends only the region, language, provider id and your key. |
+| `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
+
+No background service, no telemetry, no ads, no account sign-in. TMDb answers and posters are cached in
+the app's cache folder for six hours (`cache_hours` in `config.xml`). Opening the app again within that
+time sends nothing. When TMDb can't be reached, the last answers are shown.
+
+## Limits
+
+- OK opens the service's app at its home screen, not at the title: TMDb has no ids those apps accept.
+- TMDb's availability data is JustWatch's and can lag a day or two behind what a service actually has.
+- Plots are in Danish where TMDb has one, and empty otherwise.
+
+## Tested on
+
+Not yet tested on a TV.

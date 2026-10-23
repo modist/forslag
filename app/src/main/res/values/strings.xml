@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Forslag</string>
+    <string name="movies">Movies</string>
+    <string name="series">Series</string>
+    <string name="loading">Loading…</string>
+    <string name="no_key">No TMDb key in this build. Put tmdb.key=… in local.properties and build again.</string>
+    <string name="bad_key">TMDb refused the key. Check tmdb.key in local.properties.</string>
+    <string name="offline">Can\'t reach TMDb.</string>
+    <string name="nothing">TMDb has no titles for these services.</string>
+    <string name="no_services">None of your services were found on TMDb.</string>
+    <string name="unmatched">Not on TMDb: %1$s</string>
+    <string name="updated">Updated %1$s</string>
+    <string name="not_installed">%1$s is not installed</string>
+    <string name="attribution" translatable="false">This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming data: JustWatch.</string>
+</resources>
