@@ -29,8 +29,8 @@ final class Images {
     }
 
     /** Shows the picture in v once it is loaded, unless v has been given another picture meanwhile. */
-    void load(ImageView v, String size, String path) {
-        String key = size + path;
+    void load(ImageView v, String url) {
+        String key = url;
         v.setTag(key);
         Bitmap hit = memory.get(key);
         if (hit != null) {
@@ -41,7 +41,7 @@ final class Images {
         pool.execute(() -> {
             Bitmap b = null;
             try {
-                byte[] data = tmdb.image(size, path);
+                byte[] data = tmdb.image(url);
                 BitmapFactory.Options o = new BitmapFactory.Options();
                 o.inPreferredConfig = Bitmap.Config.RGB_565;
                 b = BitmapFactory.decodeByteArray(data, 0, data.length, o);

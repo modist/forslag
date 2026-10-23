@@ -2,14 +2,17 @@
 
 An Android TV app that shows what is included in your own streaming subscriptions right now: a row of
 movies and a row of series, most popular first, mixed from each service in turn. Focus a title to see its
-year, rating, plot and which of your services has it; press OK to open that service's app.
+year, rating, plot and which of your services has it; press OK to open it. Netflix, Disney+ and DRTV open the
+title itself where there is a link to it; the other services open at their home screen.
 
 It declares a module card for the [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher
 (label **Forslag**, caption *Film og serier*), so it can sit in the dock. It works as an ordinary app on
 any Android TV as well.
 
 The data comes from [TMDb](https://www.themoviedb.org/), whose streaming availability comes from
-JustWatch. This product uses the TMDB API but is not endorsed or certified by TMDB.
+JustWatch. This product uses the TMDB API but is not endorsed or certified by TMDB. DRTV's titles come from DR's
+own catalogue, and the Netflix and Disney+ ids that open a title directly come from
+[Wikidata](https://www.wikidata.org/) (CC0).
 
 ## Set up
 
@@ -53,7 +56,7 @@ so keep the APK to yourself.
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | Fetches lists from `api.themoviedb.org` and posters from `image.tmdb.org`. Each request sends only the region, language, provider id and your key. |
+| `INTERNET` | Fetches lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, provider id and your key. DRTV's two lists and their posters from `production.dr-massive.com` and `prod95-static.dr-massive.com`, without login. One query to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account sign-in. TMDb answers and posters are cached in
@@ -67,7 +70,12 @@ time sends nothing. When TMDb can't be reached, the last answers are shown.
   load sends about 150 small requests and takes 15 to 30 seconds; after that the cache answers.
 - Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles popular elsewhere but
   unknown here.
-- OK opens the service's app at its home screen, not at the title: TMDb has no ids those apps accept.
+- DRTV's API is DR's own but undocumented and unofficial; it can change without notice. If it fails, the rows
+  simply have no DRTV titles. The lists are `drtv_movies` and `drtv_series` in `config.xml`.
+- OK opens the title itself on Netflix and Disney+ only when Wikidata has the service's id for it, which is most
+  well-known titles and few new ones. HBO Max's ids on Wikidata are in an old format the app no longer opens,
+  and Viaplay, TV 2 Play and YouSee have none, so those open at their home screen. Netflix and Disney+ ask for a
+  profile first when they were not already running.
 - TMDb's availability data is JustWatch's and can lag a day or two behind what a service actually has.
 - Plots are in Danish where TMDb has one, and empty otherwise.
 

@@ -14,11 +14,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /**
- * GET requests to TMDb and its image server, kept on disk for a few hours so opening the app again costs nothing.
- * When TMDb can't be reached, the last answer is used however old it is.
+ * GET requests to TMDb, and to DRTV, Wikidata and the image servers, kept on disk for a few hours so opening the
+ * app again costs nothing. When a server can't be reached, the last answer is used however old it is. Only TMDb
+ * gets the key.
  */
 final class Tmdb {
-    static final String IMAGES = "https://image.tmdb.org/t/p/";
+    private static final String AGENT = "Forslag/" + BuildConfig.VERSION_NAME + " (Android TV app)";
     private static final String API = "https://api.themoviedb.org/3";
 
     /** TMDb answered 401: the key is wrong or revoked. */
@@ -43,8 +44,13 @@ final class Tmdb {
         return new JSONObject(new String(cached(API + path, true), StandardCharsets.UTF_8));
     }
 
-    byte[] image(String size, String path) throws Exception {
-        return cached(IMAGES + size + path, false);
+    /** JSON from any other server, without the key. */
+    JSONObject open(String url) throws Exception {
+        return new JSONObject(new String(cached(url, false), StandardCharsets.UTF_8));
+    }
+
+    byte[] image(String url) throws Exception {
+        return cached(url, false);
     }
 
     private byte[] cached(String url, boolean api) throws Exception {
@@ -73,7 +79,9 @@ final class Tmdb {
         HttpURLConnection c = (HttpURLConnection) new URL(full).openConnection();
         c.setConnectTimeout(8000);
         c.setReadTimeout(10000);
-        c.setRequestProperty("Accept", "application/json");
+        if (api) c.setRequestProperty("Accept", "application/json");
+        // Wikidata turns away requests without one; DR asks for an ordinary one.
+        c.setRequestProperty("User-Agent", AGENT);
         if (api && bearer) c.setRequestProperty("Authorization", "Bearer " + key);
         try {
             int code = c.getResponseCode();

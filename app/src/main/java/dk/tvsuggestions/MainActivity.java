@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,8 +25,10 @@ import android.widget.Toast;
 import org.json.JSONArray;
 
 import java.io.File;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -38,8 +41,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * What is included in your streaming subscriptions right now, from TMDb's discover API (catalogue data by
- * JustWatch): a row of movies and a row of series, most popular first, with the services in res/values/config.xml.
- * Only the region, the language and the provider ids are sent, with the key. OK opens the service's app.
+ * JustWatch) and DR's own DRTV lists: a row of movies and a row of series, with the services in
+ * res/values/config.xml. Only the region, the language and the provider ids go to TMDb, with the key; Wikidata gets
+ * the TMDb ids of the titles on Netflix and Disney+. OK opens the title in its app where there is a link to it.
  */
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
@@ -56,7 +60,7 @@ public class MainActivity extends Activity {
     /** When the rows were last filled; they are kept as they are (and the focus with them) until the cache is stale. */
     private long loadedAt;
     private String pendingBackdrop = "";
-    private final Runnable showBackdrop = () -> images.load(backdrop, "w780", pendingBackdrop);
+    private final Runnable showBackdrop = () -> images.load(backdrop, pendingBackdrop);
 
     @Override
     protected void onCreate(Bundle state) {
@@ -167,12 +171,14 @@ public class MainActivity extends Activity {
                 }
                 List<Suggestions.Service> found = new ArrayList<>();
                 for (Suggestions.Service s : services) {
-                    if (s.providerId >= 0) found.add(s);
+                    if (s.drtv || s.providerId >= 0) found.add(s);
                     else r.unmatched.add(s.names[0]);
                 }
                 Map<String, Set<Integer>> streams = new ConcurrentHashMap<>();
-                // When TMDb can't say, the title is kept: a rental now and then beats empty rows while offline.
+                // DR's own lists are what DRTV has. When TMDb can't say, the title is kept: a rental now and then
+                // beats empty rows while offline.
                 Suggestions.Check check = (t, s) -> {
+                    if (s.drtv) return true;
                     Set<Integer> on = streamsOn(t, region, streams);
                     return on == null || on.contains(s.providerId);
                 };
@@ -181,12 +187,15 @@ public class MainActivity extends Activity {
                     for (Suggestions.Service s : found) {
                         List<Suggestions.Title> l = new ArrayList<>();
                         try {
-                            l = Suggestions.parseDiscover(tmdb.json(
-                                    Suggestions.discoverPath(tv, s.providerId, region, language, minVotes)), tv);
+                            l = s.drtv
+                                    ? Suggestions.parseDrtv(tmdb.open(Suggestions.drtvListUrl(
+                                            getString(tv ? R.string.drtv_series : R.string.drtv_movies))), tv)
+                                    : Suggestions.parseDiscover(tmdb.json(
+                                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes)), tv);
                         } catch (Tmdb.KeyRefused e) {
                             throw e;
                         } catch (Exception e) {
-                            Log.w(TAG, "discover " + s.label() + ": " + e);
+                            Log.w(TAG, "list " + s.label() + ": " + e);
                         }
                         lists.add(l);
                     }
@@ -194,7 +203,9 @@ public class MainActivity extends Activity {
                     // in parallel; any further title is checked when mix reaches it.
                     int share = found.isEmpty() ? 0 : perRow / found.size() + 6;
                     ExecutorService pool = Executors.newFixedThreadPool(6);
-                    for (List<Suggestions.Title> l : lists) {
+                    for (int i = 0; i < lists.size(); i++) {
+                        if (found.get(i).drtv) continue;
+                        List<Suggestions.Title> l = lists.get(i);
                         for (Suggestions.Title t : l.subList(0, Math.min(share, l.size()))) {
                             pool.execute(() -> streamsOn(t, region, streams));
                         }
@@ -205,6 +216,7 @@ public class MainActivity extends Activity {
                     if (tv) r.series = mixed;
                     else r.movies = mixed;
                 }
+                linkIds(r);
                 if (found.isEmpty()) r.error = R.string.no_services;
                 else if (r.movies.isEmpty() && r.series.isEmpty()) r.error = R.string.nothing;
             } catch (Tmdb.KeyRefused e) {
@@ -215,6 +227,31 @@ public class MainActivity extends Activity {
             }
             main.post(() -> show(r));
         }).start();
+    }
+
+    /**
+     * Netflix and Disney+ ids from Wikidata for the titles on those services, so OK can open the title itself.
+     * One query for both rows; without an answer OK opens the app.
+     */
+    private void linkIds(Result r) {
+        List<Suggestions.Title> wanted = new ArrayList<>();
+        for (List<Suggestions.Title> row : Arrays.asList(r.movies, r.series)) {
+            for (Suggestions.Title t : row) {
+                for (Suggestions.Service s : t.services) {
+                    if (t.id > 0 && (s.pkg.equals(Suggestions.NETFLIX) || s.pkg.equals(Suggestions.DISNEY))) {
+                        wanted.add(t);
+                        break;
+                    }
+                }
+            }
+        }
+        if (wanted.isEmpty()) return;
+        try {
+            Suggestions.applyWikidata(tmdb.open("https://query.wikidata.org/sparql?format=json&query="
+                    + URLEncoder.encode(Suggestions.wikidataQuery(wanted), "UTF-8")), wanted);
+        } catch (Exception e) {
+            Log.w(TAG, "wikidata: " + e);
+        }
     }
 
     /** The providers that include t in a subscription here, or null when TMDb can't say. */
@@ -284,7 +321,7 @@ public class MainActivity extends Activity {
         shape.setCornerRadius(dp(6));
         poster.setBackground(shape);
         tile.addView(poster, new FrameLayout.LayoutParams(-1, -1));
-        if (!t.poster.isEmpty()) images.load(poster, "w185", t.poster);
+        if (!t.poster.isEmpty()) images.load(poster, t.poster);
 
         tile.setOnFocusChangeListener((v, focused) -> {
             v.animate().scaleX(focused ? 1.08f : 1f).scaleY(focused ? 1.08f : 1f).setDuration(120).start();
@@ -318,24 +355,51 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Opens the first of the title's services whose app is installed; TMDb has no ids those apps accept. */
+    /**
+     * Opens the title in the first of its services that has a link to it (Netflix, Disney+, DRTV), else the first
+     * installed app at its home screen.
+     */
     private void open(Suggestions.Title t) {
         PackageManager pm = getPackageManager();
-        for (Suggestions.Service s : t.services) {
-            if (s.pkg.isEmpty()) continue;
-            Intent i = pm.getLeanbackLaunchIntentForPackage(s.pkg);
-            if (i == null) i = pm.getLaunchIntentForPackage(s.pkg);
-            if (i == null) continue;
-            try {
-                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                return;
-            } catch (Exception e) {
-                Log.w(TAG, "open " + s.pkg + ": " + e);
+        for (boolean direct : new boolean[] {true, false}) {
+            for (Suggestions.Service s : t.services) {
+                if (s.pkg.isEmpty()) continue;
+                Intent i = direct ? link(t, s) : pm.getLeanbackLaunchIntentForPackage(s.pkg);
+                if (i == null && !direct) i = pm.getLaunchIntentForPackage(s.pkg);
+                if (i == null || i.resolveActivity(pm) == null) continue;
+                try {
+                    startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    return;
+                } catch (Exception e) {
+                    Log.w(TAG, "open " + s.pkg + ": " + e);
+                }
             }
         }
         if (!t.services.isEmpty()) {
             Toast.makeText(this, getString(R.string.not_installed, t.services.get(0).label()), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /**
+     * A link the app opens the title from, as tested on a Philips Android TV; null when there is no id. A running
+     * app ignores a link sent to the screen it is on, so CLEAR_TOP makes it open that screen afresh with the link.
+     */
+    private static Intent link(Suggestions.Title t, Suggestions.Service s) {
+        String url;
+        if (s.pkg.equals(Suggestions.NETFLIX) && !t.netflixId.isEmpty()) {
+            url = "https://www.netflix.com/title/" + t.netflixId;
+        } else if (s.pkg.equals(Suggestions.DISNEY) && !t.disneyId.isEmpty()) {
+            url = "https://www.disneyplus.com/" + (t.tv ? "series/" : "movies/") + Suggestions.slug(t.name) + "/" + t.disneyId;
+        } else if (s.pkg.equals(Suggestions.DRTV) && !t.drPath.isEmpty()) {
+            url = "https://www.dr.dk/drtv" + t.drPath;
+        } else {
+            return null;
+        }
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(s.pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        // Netflix opens the title only when it is told where the link came from.
+        if (s.pkg.equals(Suggestions.NETFLIX)) i.putExtra("source", "30");
+        return i;
     }
 
     private TextView rowLabel(LinearLayout col, int text) {
