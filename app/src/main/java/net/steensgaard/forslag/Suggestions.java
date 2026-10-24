@@ -20,7 +20,7 @@ final class Suggestions {
     private Suggestions() {}
 
     static final String NETFLIX = "com.netflix.ninja", DISNEY = "com.disney.disneyplus", DRTV = "dk.dr.tvplayer",
-            VIAPLAY = "com.viaplay.android";
+            VIAPLAY = "com.viaplay.android", HBO = "com.wbd.stream";
     /** Where a service's titles come from: TMDb, or the service's own catalogue. */
     static final String FROM_TMDB = "tmdb", FROM_DRTV = "drtv", FROM_VIAPLAY = "viaplay";
 
@@ -64,6 +64,9 @@ final class Suggestions {
         double rating;
         /** What the apps open a title by: Netflix and Disney+ ids from Wikidata, DRTV's and Viaplay's own paths. */
         String netflixId = "", disneyId = "", drPath = "", viaplayPath = "";
+        /** Links to the title by app package, from Movie of the Night, once asked (see motnPath). */
+        final Map<String, String> links = new HashMap<>();
+        boolean linksAsked;
         final List<Service> services = new ArrayList<>();
         /** TMDb's genre ids, and DR's and Viaplay's genre words (lower case), for the genre tabs. */
         final Set<Integer> genres = new HashSet<>();
@@ -417,6 +420,42 @@ final class Suggestions {
     /** Viaplay's image URLs carry the size to scale to. */
     static String viaplaySize(String url, int width, int height) {
         return url.replaceFirst("width=\\d+&height=\\d+", "width=" + width + "&height=" + height);
+    }
+
+    static final String MOTN_API = "https://api.movieofthenight.com/v4";
+
+    /** Movie of the Night's id for a service whose title links it knows, or null. */
+    static String motnService(String pkg) {
+        switch (pkg) {
+            case NETFLIX: return "netflix";
+            case DISNEY: return "disney";
+            case HBO: return "hbo";
+            default: return null;
+        }
+    }
+
+    /** Movie of the Night's entry for one title by its TMDb id, with where it streams in one country. */
+    static String motnPath(Title t, String country) {
+        return MOTN_API + "/shows/" + (t.tv ? "tv/" : "movie/") + t.id + "?country="
+                + country.toLowerCase(Locale.ROOT) + "&series_granularity=show";
+    }
+
+    /** The title's page in each app that has it in the subscription in this country, by app package. */
+    static Map<String, String> parseMotn(JSONObject json, String country) {
+        Map<String, String> out = new HashMap<>();
+        JSONObject options = json.optJSONObject("streamingOptions");
+        JSONArray here = options != null ? options.optJSONArray(country.toLowerCase(Locale.ROOT)) : null;
+        for (int i = 0; here != null && i < here.length(); i++) {
+            JSONObject o = here.optJSONObject(i);
+            JSONObject service = o != null ? o.optJSONObject("service") : null;
+            if (service == null || !str(o, "type").equals("subscription")) continue;
+            String link = str(o, "link");
+            if (!link.startsWith("https://")) continue;
+            for (String pkg : new String[] {NETFLIX, DISNEY, HBO}) {
+                if (motnService(pkg).equals(str(service, "id"))) out.putIfAbsent(pkg, link);
+            }
+        }
+        return out;
     }
 
     /** One SPARQL query for the Netflix and Disney+ ids of all these titles, by their TMDb ids. */

@@ -263,6 +263,25 @@ public class SuggestionsTest {
         assertNull(Suggestions.viaplayGenreUrl(page, genre("animation")));
     }
 
+    @Test
+    public void movieOfTheNightLinksForSubscriptionsInTheCountry() throws Exception {
+        Suggestions.Title batman = title(272);
+        assertEquals("https://api.movieofthenight.com/v4/shows/movie/272?country=dk&series_granularity=show",
+                Suggestions.motnPath(batman, "DK"));
+        JSONObject json = new JSONObject("{\"streamingOptions\":{\"dk\":["
+                + "{\"service\":{\"id\":\"apple\"},\"type\":\"rent\",\"link\":\"https://tv.apple.com/x\"},"
+                + "{\"service\":{\"id\":\"hbo\"},\"type\":\"addon\",\"link\":\"https://www.primevideo.com/x\"},"
+                + "{\"service\":{\"id\":\"hbo\"},\"type\":\"subscription\",\"link\":\"https://play.max.com/movie/abc\"},"
+                + "{\"service\":{\"id\":\"netflix\"},\"type\":\"subscription\",\"link\":\"https://www.netflix.com/title/70021642/\"}],"
+                + "\"se\":[{\"service\":{\"id\":\"disney\"},\"type\":\"subscription\",\"link\":\"https://www.disneyplus.com/x\"}]}}");
+        java.util.Map<String, String> links = Suggestions.parseMotn(json, "DK");
+        assertEquals(2, links.size());
+        assertEquals("https://play.max.com/movie/abc", links.get(Suggestions.HBO));
+        assertEquals("https://www.netflix.com/title/70021642/", links.get(Suggestions.NETFLIX));
+        assertNull(Suggestions.motnService(Suggestions.VIAPLAY));
+        assertTrue(Suggestions.parseMotn(new JSONObject("{}"), "DK").isEmpty());
+    }
+
     private static Suggestions.Genre genre(String key) {
         for (Suggestions.Genre g : Suggestions.GENRES) if (g.key.equals(key)) return g;
         throw new AssertionError(key);

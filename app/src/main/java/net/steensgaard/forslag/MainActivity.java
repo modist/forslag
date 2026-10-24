@@ -561,10 +561,36 @@ public class MainActivity extends Activity {
 
     /**
      * Opens the title in the first of its services that has a link to it (Netflix, Disney+, DRTV, Viaplay), else
-     * the first installed app at its home screen.
+     * the first installed app at its home screen. When none has a link yet and one of them is HBO Max, Netflix or
+     * Disney+, Movie of the Night is asked first, once per title: one request per press, never while browsing.
      */
     private void open(Suggestions.Title t) {
         PackageManager pm = getPackageManager();
+        if (!t.linksAsked && t.id > 0 && !BuildConfig.MOTN_KEY.isEmpty()) {
+            boolean linked = false, askable = false;
+            for (Suggestions.Service s : t.services) {
+                linked |= link(t, s) != null;
+                askable |= Suggestions.motnService(s.pkg) != null;
+            }
+            if (!linked && askable) {
+                t.linksAsked = true;
+                new Thread(() -> {
+                    Map<String, String> found = Collections.emptyMap();
+                    try {
+                        found = Suggestions.parseMotn(tmdb.open(Suggestions.motnPath(t, region), "X-API-Key",
+                                BuildConfig.MOTN_KEY), region);
+                    } catch (Exception e) {
+                        Log.w(TAG, "movie of the night: " + e);
+                    }
+                    final Map<String, String> links = found;
+                    main.post(() -> {
+                        t.links.putAll(links);
+                        if (!isDestroyed()) open(t);
+                    });
+                }).start();
+                return;
+            }
+        }
         for (boolean direct : new boolean[] {true, false}) {
             for (Suggestions.Service s : t.services) {
                 if (s.pkg.isEmpty()) continue;
@@ -590,7 +616,9 @@ public class MainActivity extends Activity {
      */
     private static Intent link(Suggestions.Title t, Suggestions.Service s) {
         String url;
-        if (s.pkg.equals(Suggestions.NETFLIX) && !t.netflixId.isEmpty()) {
+        if (t.links.containsKey(s.pkg)) {
+            url = t.links.get(s.pkg);
+        } else if (s.pkg.equals(Suggestions.NETFLIX) && !t.netflixId.isEmpty()) {
             url = "https://www.netflix.com/title/" + t.netflixId;
         } else if (s.pkg.equals(Suggestions.DISNEY) && !t.disneyId.isEmpty()) {
             url = "https://www.disneyplus.com/" + (t.tv ? "series/" : "movies/") + Suggestions.slug(t.name) + "/" + t.disneyId;

@@ -46,18 +46,27 @@ final class Tmdb {
 
     /** JSON from any other server, without the key. */
     JSONObject open(String url) throws Exception {
-        return new JSONObject(new String(cached(url, false), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(url, false, null, null), StandardCharsets.UTF_8));
+    }
+
+    /** JSON from a server that takes its own key in a header; the key is not part of the cache's file name. */
+    JSONObject open(String url, String header, String value) throws Exception {
+        return new JSONObject(new String(cached(url, false, header, value), StandardCharsets.UTF_8));
     }
 
     byte[] image(String url) throws Exception {
-        return cached(url, false);
+        return cached(url, false, null, null);
     }
 
     private byte[] cached(String url, boolean api) throws Exception {
+        return cached(url, api, null, null);
+    }
+
+    private byte[] cached(String url, boolean api, String header, String value) throws Exception {
         File f = new File(dir, sha1(url));
         if (f.exists() && System.currentTimeMillis() - f.lastModified() < freshMs) return read(new FileInputStream(f));
         try {
-            byte[] body = fetch(url, api);
+            byte[] body = fetch(url, api, header, value);
             File tmp = new File(dir, f.getName() + ".tmp");
             try (FileOutputStream out = new FileOutputStream(tmp)) {
                 out.write(body);
@@ -73,7 +82,7 @@ final class Tmdb {
     }
 
     /** A v4 read access token (a JWT, "eyJ…") goes in a header; a v3 key goes in the query. */
-    private byte[] fetch(String url, boolean api) throws Exception {
+    private byte[] fetch(String url, boolean api, String header, String value) throws Exception {
         boolean bearer = key.startsWith("eyJ");
         String full = api && !bearer ? url + (url.contains("?") ? "&" : "?") + "api_key=" + key : url;
         HttpURLConnection c = (HttpURLConnection) new URL(full).openConnection();
@@ -83,6 +92,7 @@ final class Tmdb {
         // Wikidata turns away requests without one; DR asks for an ordinary one.
         c.setRequestProperty("User-Agent", AGENT);
         if (api && bearer) c.setRequestProperty("Authorization", "Bearer " + key);
+        if (header != null) c.setRequestProperty(header, value);
         try {
             int code = c.getResponseCode();
             if (code == 401) throw new KeyRefused();

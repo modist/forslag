@@ -7,6 +7,8 @@ def local = new Properties()
 def localFile = rootProject.file('local.properties')
 if (localFile.exists()) localFile.withInputStream { local.load(it) }
 def tmdbKey = local.getProperty('tmdb.key') ?: System.getenv('TMDB_KEY') ?: ''
+// Optional: a Movie of the Night key (motn.key or MOTN_KEY) finds the HBO Max, Netflix and Disney+ page of a title.
+def motnKey = local.getProperty('motn.key') ?: System.getenv('MOTN_KEY') ?: ''
 
 android {
     namespace 'net.steensgaard.forslag'
@@ -19,6 +21,7 @@ android {
         versionCode 1
         versionName '1.0'
         buildConfigField 'String', 'TMDB_KEY', '"' + tmdbKey.trim() + '"'
+        buildConfigField 'String', 'MOTN_KEY', '"' + motnKey.trim() + '"'
     }
 
     buildFeatures {
