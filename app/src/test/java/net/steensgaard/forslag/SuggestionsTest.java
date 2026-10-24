@@ -294,6 +294,22 @@ public class SuggestionsTest {
         assertEquals(Arrays.asList(good), Suggestions.rated(Arrays.asList(good, poor, unrated), 7.0));
     }
 
+    @Test
+    public void rowsSortByDateOrRatingAndKeepThePopularOrderOtherwise() {
+        Suggestions.Title a = title(1), b = title(2), c = title(3), d = title(4);
+        a.date = "2019-07-24";
+        a.rating = 7.4;
+        b.date = "2026-03-01";
+        b.rating = 8.6;
+        c.date = "2021";
+        d.rating = 9.0;
+        List<Suggestions.Title> row = Arrays.asList(a, b, c, d);
+        assertEquals(row, Suggestions.sorted(row, Suggestions.POPULAR));
+        assertEquals(Arrays.asList(b, c, a, d), Suggestions.sorted(row, Suggestions.NEWEST));
+        assertEquals(Arrays.asList(d, b, a, c), Suggestions.sorted(row, Suggestions.RATING));
+        assertEquals(Arrays.asList(a, b, c, d), row);
+    }
+
     private static Suggestions.Genre genre(String key) {
         for (Suggestions.Genre g : Suggestions.GENRES) if (g.key.equals(key)) return g;
         throw new AssertionError(key);

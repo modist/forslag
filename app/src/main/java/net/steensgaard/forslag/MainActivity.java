@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -70,7 +71,9 @@ public class MainActivity extends Activity {
     private volatile boolean topRated;
     private double topMin;
     private SharedPreferences prefs;
-    private TextView topToggle;
+    private TextView topToggle, sortButton;
+    /** How the rows are ordered: one of Suggestions.ORDERS. Kept between launches. */
+    private String order;
     private boolean loading;
     /** When the rows were last filled; they are kept as they are (and the focus with them) until the cache is stale. */
     private long loadedAt;
@@ -198,6 +201,24 @@ public class MainActivity extends Activity {
         return (g == null ? "all" : g.key) + (top ? ":top" : "");
     }
 
+    /** The next order on OK: popular, newest, rating, popular. Only re-sorts what the rows hold; no API calls. */
+    private void nextOrder() {
+        int i = Arrays.asList(Suggestions.ORDERS).indexOf(order);
+        order = Suggestions.ORDERS[(i + 1) % Suggestions.ORDERS.length];
+        prefs.edit().putString("order", order).apply();
+        showOrder();
+        for (Section s : new Section[] {movies, series}) {
+            List<Suggestions.Title> shown = s.showing == null ? null : s.fetched.get(s.showing);
+            if (shown != null) fill(s, shown);
+        }
+    }
+
+    private void showOrder() {
+        int label = order.equals(Suggestions.NEWEST) ? R.string.order_newest
+                : order.equals(Suggestions.RATING) ? R.string.order_rating : R.string.order_popular;
+        sortButton.setText(getString(R.string.sort, getString(label)));
+    }
+
     /** Turns "Top rated" on or off and fetches both rows again, each in the genre it shows. */
     private void toggleTopRated() {
         topRated = !topRated;
@@ -219,6 +240,7 @@ public class MainActivity extends Activity {
         topMin = Double.parseDouble(getString(R.string.top_rated_min));
         prefs = getSharedPreferences("forslag", MODE_PRIVATE);
         topRated = prefs.getBoolean("top_rated", false);
+        order = prefs.getString("order", Suggestions.POPULAR);
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
@@ -259,7 +281,19 @@ public class MainActivity extends Activity {
         topToggle.setSelected(topRated);
         topToggle.setFocusable(false);
         topToggle.setOnClickListener(v -> toggleTopRated());
-        top.addView(topToggle, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
+        sortButton = text(13, Typeface.NORMAL, 0xFFFFFFFF);
+        sortButton.setPadding(dp(12), dp(4), dp(12), dp(4));
+        sortButton.setBackground(tabBackground());
+        sortButton.setFocusable(false);
+        sortButton.setOnClickListener(v -> nextOrder());
+        showOrder();
+        LinearLayout controls = new LinearLayout(this);
+        controls.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
+        gap.setMargins(0, 0, dp(8), 0);
+        controls.addView(sortButton, gap);
+        controls.addView(topToggle);
+        top.addView(controls, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
         meta = oneLine(text(15, Typeface.NORMAL, accent));
         meta.setPadding(0, dp(6), 0, dp(8));
         header.addView(meta);
@@ -531,6 +565,7 @@ public class MainActivity extends Activity {
                 s.showing = key(null, r.top);
                 s.enableTabs();
                 topToggle.setFocusable(true);
+                sortButton.setFocusable(true);
             }
             View first = movies.row.getChildCount() > 0 ? movies.row.getChildAt(0) : series.row.getChildAt(0);
             if (first != null) first.requestFocus();
@@ -547,7 +582,7 @@ public class MainActivity extends Activity {
             return;
         }
         s.row.removeAllViews();
-        for (Suggestions.Title t : titles) s.row.addView(tile(t));
+        for (Suggestions.Title t : Suggestions.sorted(titles, order)) s.row.addView(tile(t));
         ((HorizontalScrollView) s.row.getParent()).scrollTo(0, 0);
     }
 

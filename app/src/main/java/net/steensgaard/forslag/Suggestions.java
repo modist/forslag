@@ -62,6 +62,8 @@ final class Suggestions {
         boolean tv;
         /** poster and backdrop are full URLs. */
         String name = "", year = "", overview = "", poster = "", backdrop = "";
+        /** The release date as TMDb gives it (2019-07-24), or only the year where DR or Viaplay is the source. */
+        String date = "";
         double rating;
         /** What the apps open a title by: Netflix and Disney+ ids from Wikidata, DRTV's and Viaplay's own paths. */
         String netflixId = "", disneyId = "", drPath = "", viaplayPath = "";
@@ -78,6 +80,7 @@ final class Suggestions {
             if (id == 0) id = o.id;
             if (rating == 0) rating = o.rating;
             if (year.isEmpty()) year = o.year;
+            if (date.length() < o.date.length()) date = o.date;
             if (overview.isEmpty()) overview = o.overview;
             if (poster.isEmpty()) poster = o.poster;
             if (backdrop.isEmpty()) backdrop = o.backdrop;
@@ -223,6 +226,21 @@ final class Suggestions {
                 + "&vote_count.gte=" + minVotes + rated + genres + "&language=" + language + "&page=1";
     }
 
+    /** The ways a row can be ordered: as mixed (most popular first, the services taking turns), newest, best rated. */
+    static final String POPULAR = "popular", NEWEST = "newest", RATING = "rating";
+    static final String[] ORDERS = {POPULAR, NEWEST, RATING};
+
+    /**
+     * The row in another order, without asking any server: newest by release date (titles without one last), or
+     * best rated (unrated last). Ties keep the popular order.
+     */
+    static List<Title> sorted(List<Title> titles, String order) {
+        List<Title> out = new ArrayList<>(titles);
+        if (order.equals(NEWEST)) out.sort((a, b) -> b.date.compareTo(a.date));
+        else if (order.equals(RATING)) out.sort((a, b) -> Double.compare(b.rating, a.rating));
+        return out;
+    }
+
     /** The titles rated at least min; a title without a rating (DR gives none) is left out. */
     static List<Title> rated(List<Title> titles, double min) {
         List<Title> out = new ArrayList<>();
@@ -268,6 +286,7 @@ final class Suggestions {
             t.name = str(r, tv ? "name" : "title");
             String date = str(r, tv ? "first_air_date" : "release_date");
             t.year = date.length() >= 4 ? date.substring(0, 4) : "";
+            t.date = date;
             t.overview = str(r, "overview");
             String poster = str(r, "poster_path"), backdrop = str(r, "backdrop_path");
             t.poster = poster.isEmpty() ? "" : TMDB_IMAGES + "w185" + poster;
@@ -304,6 +323,7 @@ final class Suggestions {
             t.tv = tv;
             t.name = str(r, "title");
             t.year = r.optInt("releaseYear", 0) > 0 ? String.valueOf(r.optInt("releaseYear")) : "";
+            t.date = t.year;
             t.overview = str(r, "shortDescription");
             t.drPath = str(r, "path");
             // Series carry categories ("dokumentar", "underholdning", "krimi"), films only keywords
@@ -399,6 +419,7 @@ final class Suggestions {
             JSONObject production = c.optJSONObject("production");
             int year = production != null ? production.optInt("year", 0) : 0;
             t.year = year > 0 ? String.valueOf(year) : "";
+            t.date = t.year;
             t.overview = !str(c, "synopsis").isEmpty() || series == null ? str(c, "synopsis") : str(series, "synopsis");
             JSONObject imdb = c.optJSONObject("imdb");
             try {
