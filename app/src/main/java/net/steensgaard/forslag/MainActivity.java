@@ -16,7 +16,9 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -52,8 +54,9 @@ import java.util.concurrent.TimeUnit;
  * JustWatch) and DRTV's and Viaplay's own catalogues: a row of movies and a row of series, each with genre tabs, with
  * the services in res/values/config.xml, a Top rated switch and a Sort button. Only the region, the language, the
  * genre, the rating and the provider or title ids go to TMDb, with the key; Wikidata gets the TMDb ids of the titles
- * on Netflix and Disney+, and Movie of the Night one title's id when OK is pressed on it. OK opens the title in its
- * app where there is a link to it. Every answer is cached for cache_hours.
+ * on Netflix and Disney+, and Movie of the Night one title's id when Watch is pressed on it. OK on a title shows its
+ * detail page, with a Watch button per service that opens the title in that app where there is a link to it, and a
+ * Back button that (like the remote's) returns to the rows. Every answer is cached for cache_hours.
  */
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
@@ -86,6 +89,17 @@ public class MainActivity extends Activity {
     private JSONObject ids;
     private String pendingBackdrop = "";
     private final Runnable showBackdrop = () -> images.load(backdrop, pendingBackdrop);
+    /** The header and the rows, kept from taking the focus while the detail page is up. */
+    private LinearLayout content;
+    /** The detail page OK on a title shows over the rows, until Back. */
+    private FrameLayout detail;
+    private ImageView detailBackdrop, detailPoster;
+    private TextView detailTitle, detailMeta, detailOverview, backButton;
+    /** One Watch button per service that has the title; Back is on the line below. */
+    private LinearLayout detailButtons;
+    /** The title on the detail page, and the tile the focus goes back to when it closes. */
+    private Suggestions.Title detailOf;
+    private View returnTo;
 
     /** The movie or series row: its genre tabs, its tiles, and the rows already fetched, by genre. */
     private final class Section {
@@ -265,6 +279,7 @@ public class MainActivity extends Activity {
         col.setClipToPadding(false);
         col.setClipChildren(false);
         root.addView(col, new FrameLayout.LayoutParams(-1, -1));
+        content = col;
 
         FrameLayout top = new FrameLayout(this);
         col.addView(top, new LinearLayout.LayoutParams(-1, dp(112)));
@@ -316,8 +331,178 @@ public class MainActivity extends Activity {
         credit.setPadding(0, dp(2), 0, 0);
         col.addView(credit);
 
+        buildDetail(root);
         status.setText(R.string.loading);
         setContentView(root);
+    }
+
+    /** The detail page: a large backdrop, the poster, the whole plot, and the Watch and Back buttons. Hidden at first. */
+    private void buildDetail(FrameLayout root) {
+        detail = new FrameLayout(this);
+        detail.setBackgroundColor(0xFF000000);
+        detail.setVisibility(View.GONE);
+        detailBackdrop = new ImageView(this);
+        detailBackdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        detailBackdrop.setAlpha(0.6f);
+        detail.addView(detailBackdrop, new FrameLayout.LayoutParams(-1, -1));
+        View shade = new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] {0xF2000000, 0xB3000000, 0x33000000}));
+        detail.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        // From the top, so the poster and the title line up however long the plot and however many the services.
+        body.setGravity(Gravity.TOP);
+        body.setPadding(dp(64), dp(56), dp(64), dp(32));
+        detail.addView(body, new FrameLayout.LayoutParams(-1, -1));
+        detailPoster = new ImageView(this);
+        detailPoster.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        detailPoster.setClipToOutline(true);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setCornerRadius(dp(8));
+        detailPoster.setBackground(shape);
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(200), dp(295));
+        plp.setMargins(0, 0, dp(40), 0);
+        body.addView(detailPoster, plp);
+
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        body.addView(words, new LinearLayout.LayoutParams(0, -2, 1f));
+        // The text takes half the screen, so the right of the backdrop shows; the buttons may run wider.
+        int half = Math.round(getResources().getDisplayMetrics().widthPixels * 0.5f);
+        detailTitle = text(30, Typeface.BOLD, 0xFFFFFFFF);
+        detailTitle.setMaxLines(2);
+        detailTitle.setEllipsize(TextUtils.TruncateAt.END);
+        words.addView(detailTitle, new LinearLayout.LayoutParams(half, -2));
+        detailMeta = oneLine(text(16, Typeface.NORMAL, accent));
+        detailMeta.setPadding(0, dp(8), 0, dp(16));
+        words.addView(detailMeta, new LinearLayout.LayoutParams(half, -2));
+        detailOverview = text(16, Typeface.NORMAL, 0xDDFFFFFF);
+        detailOverview.setMaxLines(5);
+        detailOverview.setEllipsize(TextUtils.TruncateAt.END);
+        detailOverview.setLineSpacing(0, 1.2f);
+        words.addView(detailOverview, new LinearLayout.LayoutParams(half, -2));
+
+        // Lines of Watch buttons, filled by fillButtons.
+        detailButtons = new LinearLayout(this);
+        detailButtons.setOrientation(LinearLayout.VERTICAL);
+        detailButtons.setPadding(0, dp(24), 0, 0);
+        words.addView(detailButtons, new LinearLayout.LayoutParams(-1, -2));
+        // Back on a line of its own, below the services.
+        backButton = button();
+        backButton.setText(R.string.back);
+        backButton.setOnClickListener(v -> hideDetail());
+        LinearLayout.LayoutParams below = new LinearLayout.LayoutParams(-2, -2);
+        below.setMargins(0, dp(12), 0, 0);
+        words.addView(backButton, below);
+        root.addView(detail, new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    /**
+     * The Watch buttons for t: one per service that has it, in the order of config.xml, on as many lines as the
+     * space right of the poster needs.
+     */
+    private void fillButtons(Suggestions.Title t) {
+        detailButtons.removeAllViews();
+        int room = getResources().getDisplayMetrics().widthPixels - dp(64 + 200 + 40 + 64);
+        LinearLayout line = null;
+        int used = 0;
+        for (Suggestions.Service s : t.services) {
+            if (s.pkg.isEmpty()) continue;
+            TextView b = button();
+            b.setText(getString(R.string.watch_on, s.label()));
+            b.setTag(s);
+            b.setOnClickListener(v -> open(t, s));
+            b.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+            int width = b.getMeasuredWidth() + dp(12);
+            if (line == null || used + width > room) {
+                line = new LinearLayout(this);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+                if (detailButtons.getChildCount() > 0) lp.setMargins(0, dp(12), 0, 0);
+                detailButtons.addView(line, lp);
+                used = 0;
+            }
+            LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
+            gap.setMargins(0, 0, dp(12), 0);
+            line.addView(b, gap);
+            used += width;
+        }
+    }
+
+    /** The button the focus starts on: the first service whose app is installed, else the first service, else Back. */
+    private View firstButton() {
+        PackageManager pm = getPackageManager();
+        View first = null;
+        for (int i = 0; i < detailButtons.getChildCount(); i++) {
+            LinearLayout line = (LinearLayout) detailButtons.getChildAt(i);
+            for (int j = 0; j < line.getChildCount(); j++) {
+                View b = line.getChildAt(j);
+                if (first == null) first = b;
+                if (intent(detailOf, (Suggestions.Service) b.getTag(), 2, pm) != null) return b;
+            }
+        }
+        return first != null ? first : backButton;
+    }
+
+    /** A button on the detail page: filled with the accent while focused. */
+    private TextView button() {
+        TextView b = text(15, Typeface.BOLD, 0xFFFFFFFF);
+        b.setPadding(dp(18), dp(8), dp(18), dp(8));
+        b.setFocusable(true);
+        StateListDrawable d = new StateListDrawable();
+        d.addState(new int[] {android.R.attr.state_focused}, pill(accent, 0xFFFFFFFF));
+        d.addState(new int[] {}, pill(0x33FFFFFF, 0));
+        b.setBackground(d);
+        b.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}},
+                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        return b;
+    }
+
+    /** OK on a tile: the title's detail page, with the focus on Watch on its first installed service. */
+    private void showDetail(Suggestions.Title t, View from) {
+        detailOf = t;
+        returnTo = from;
+        detailTitle.setText(t.name);
+        detailMeta.setText(metaLine(t));
+        detailOverview.setText(t.overview);
+        detailOverview.setVisibility(t.overview.isEmpty() ? View.GONE : View.VISIBLE);
+        detailPoster.setVisibility(t.poster.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!t.poster.isEmpty()) images.load(detailPoster, t.poster);
+        if (t.backdrop.isEmpty()) {
+            detailBackdrop.setTag(null);
+            detailBackdrop.setImageDrawable(null);
+        } else {
+            images.load(detailBackdrop, t.backdrop);
+        }
+        fillButtons(t);
+        detail.setVisibility(View.VISIBLE);
+        content.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        firstButton().requestFocus();
+    }
+
+    /** Back to the rows, on the tile the detail page came from (or the first, if the rows were filled meanwhile). */
+    private void hideDetail() {
+        detail.setVisibility(View.GONE);
+        content.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        View back = returnTo != null && returnTo.isAttachedToWindow() ? returnTo : firstTile();
+        if (back != null) back.requestFocus();
+        detailOf = null;
+        returnTo = null;
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.KEYCODE_BACK && detail.getVisibility() == View.VISIBLE) {
+            if (e.getAction() == KeyEvent.ACTION_UP) hideDetail();
+            return true;
+        }
+        return super.dispatchKeyEvent(e);
+    }
+
+    private View firstTile() {
+        return movies.row.getChildCount() > 0 ? movies.row.getChildAt(0) : series.row.getChildAt(0);
     }
 
     @Override
@@ -568,7 +753,7 @@ public class MainActivity extends Activity {
                 topToggle.setFocusable(true);
                 sortButton.setFocusable(true);
             }
-            View first = movies.row.getChildCount() > 0 ? movies.row.getChildAt(0) : series.row.getChildAt(0);
+            View first = firstTile();
             if (first != null) first.requestFocus();
         }
         StringBuilder line = new StringBuilder(r.error != 0 ? getString(r.error)
@@ -662,22 +847,27 @@ public class MainActivity extends Activity {
             v.animate().scaleX(focused ? 1.08f : 1f).scaleY(focused ? 1.08f : 1f).setDuration(120).start();
             if (focused) describe(t);
         });
-        tile.setOnClickListener(v -> open(t));
+        tile.setOnClickListener(v -> showDetail(t, v));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(92), dp(135));
         lp.setMargins(0, 0, dp(12), 0);
         tile.setLayoutParams(lp);
         return tile;
     }
 
-    private void describe(Suggestions.Title t) {
-        title.setText(t.name);
+    /** Year, rating and the services that have the title. */
+    private static String metaLine(Suggestions.Title t) {
         List<String> parts = new ArrayList<>();
         if (!t.year.isEmpty()) parts.add(t.year);
         if (t.rating > 0) parts.add(String.format(Locale.ROOT, "★ %.1f", t.rating));
         List<String> names = new ArrayList<>();
         for (Suggestions.Service s : t.services) names.add(s.label());
         parts.add(TextUtils.join(", ", names));
-        meta.setText(TextUtils.join("  ·  ", parts));
+        return TextUtils.join("  ·  ", parts);
+    }
+
+    private void describe(Suggestions.Title t) {
+        title.setText(t.name);
+        meta.setText(metaLine(t));
         overview.setText(t.overview);
         // Wait for the focus to settle before fetching a large picture while the D-pad is held.
         main.removeCallbacks(showBackdrop);
@@ -691,20 +881,15 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Opens the title in the first of its services that has a link to it (Netflix, Disney+, HBO Max, Prime Video,
-     * DRTV, Viaplay), else the search for it in Prime Video or HBO Max, else the first installed app at its home
-     * screen. When none has a link yet and one of them is HBO Max, Netflix, Disney+ or Prime Video, Movie of the
-     * Night is asked first, once per title: one request per press, never while browsing.
+     * Opens the title on service s: a link to it where there is one (Netflix, Disney+, HBO Max, Prime Video, DRTV,
+     * Viaplay), else the app's search for it (Prime Video, HBO Max), else the app at its home screen. When s has no
+     * link yet and is HBO Max, Netflix, Disney+ or Prime Video, Movie of the Night is asked first, once per title
+     * (its answer covers every service): one request per press, never while browsing.
      */
-    private void open(Suggestions.Title t) {
+    private void open(Suggestions.Title t, Suggestions.Service s) {
         PackageManager pm = getPackageManager();
         if (!t.linksAsked && t.id > 0 && !BuildConfig.MOTN_KEY.isEmpty()) {
-            boolean linked = false, askable = false;
-            for (Suggestions.Service s : t.services) {
-                linked |= link(t, s) != null;
-                askable |= Suggestions.motnService(s.pkg) != null;
-            }
-            if (!linked && askable) {
+            if (link(t, s) == null && Suggestions.motnService(s.pkg) != null) {
                 t.linksAsked = true;
                 new Thread(() -> {
                     Map<String, String> found = Collections.emptyMap();
@@ -717,7 +902,7 @@ public class MainActivity extends Activity {
                     final Map<String, String> links = found;
                     main.post(() -> {
                         t.links.putAll(links);
-                        if (!isDestroyed()) open(t);
+                        if (!isDestroyed()) open(t, s);
                     });
                 }).start();
                 return;
@@ -725,22 +910,24 @@ public class MainActivity extends Activity {
         }
         // First a link to the title itself, then the app's search for it (Prime Video, HBO Max), then the app.
         for (int step = 0; step < 3; step++) {
-            for (Suggestions.Service s : t.services) {
-                if (s.pkg.isEmpty()) continue;
-                Intent i = step == 0 ? link(t, s) : step == 1 ? search(t, s) : pm.getLeanbackLaunchIntentForPackage(s.pkg);
-                if (i == null && step == 2) i = pm.getLaunchIntentForPackage(s.pkg);
-                if (i == null || i.resolveActivity(pm) == null) continue;
-                try {
-                    startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                    return;
-                } catch (Exception e) {
-                    Log.w(TAG, "open " + s.pkg + ": " + e);
-                }
+            Intent i = intent(t, s, step, pm);
+            if (i == null) continue;
+            try {
+                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "open " + s.pkg + ": " + e);
             }
         }
-        if (!t.services.isEmpty()) {
-            Toast.makeText(this, getString(R.string.not_installed, t.services.get(0).label()), Toast.LENGTH_SHORT).show();
-        }
+        Toast.makeText(this, getString(R.string.not_installed, s.label()), Toast.LENGTH_SHORT).show();
+    }
+
+    /** What open() tries for t on s at a step: 0 a link to the title, 1 the app's search for it, 2 the app; null if none. */
+    private static Intent intent(Suggestions.Title t, Suggestions.Service s, int step, PackageManager pm) {
+        if (s.pkg.isEmpty()) return null;
+        Intent i = step == 0 ? link(t, s) : step == 1 ? search(t, s) : pm.getLeanbackLaunchIntentForPackage(s.pkg);
+        if (i == null && step == 2) i = pm.getLaunchIntentForPackage(s.pkg);
+        return i == null || i.resolveActivity(pm) == null ? null : i;
     }
 
     /**
