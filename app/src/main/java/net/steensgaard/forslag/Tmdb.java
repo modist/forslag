@@ -14,9 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /**
- * GET requests to TMDb, and to DRTV, Wikidata and the image servers, kept on disk for a few hours so opening the
- * app again costs nothing. When a server can't be reached, the last answer is used however old it is. Only TMDb
- * gets the key.
+ * GET requests to TMDb, and to DRTV, Viaplay, Wikidata, Movie of the Night and the image servers, kept on disk for
+ * cache_hours (76) so the APIs are asked as little as possible. When a server can't be reached, the last answer is
+ * used however old it is. Only TMDb gets the TMDb key, and only Movie of the Night its own.
  */
 final class Tmdb {
     private static final String AGENT = "Forslag/" + BuildConfig.VERSION_NAME + " (Android TV app)";

@@ -13,8 +13,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Everything about the suggestions that does not need Android: services, TMDb, DRTV and Wikidata requests and
- * answers, and mixing the rows.
+ * Everything about the suggestions that does not need Android: services and genres, the requests to TMDb, DRTV,
+ * Viaplay, Wikidata and Movie of the Night and their answers, and mixing, filtering and sorting the rows.
  */
 final class Suggestions {
     private Suggestions() {}

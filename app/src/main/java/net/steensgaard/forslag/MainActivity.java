@@ -49,10 +49,11 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * What is included in your streaming subscriptions right now, from TMDb's discover API (catalogue data by
- * JustWatch) and DR's own DRTV lists: a row of movies and a row of series, each with genre tabs, with the services
- * in res/values/config.xml. Only the region, the language, the genre and the provider ids go to TMDb, with the key;
- * Wikidata gets the TMDb ids of the titles on Netflix and Disney+. OK opens the title in its app where there is a
- * link to it.
+ * JustWatch) and DRTV's and Viaplay's own catalogues: a row of movies and a row of series, each with genre tabs, with
+ * the services in res/values/config.xml, a Top rated switch and a Sort button. Only the region, the language, the
+ * genre, the rating and the provider or title ids go to TMDb, with the key; Wikidata gets the TMDb ids of the titles
+ * on Netflix and Disney+, and Movie of the Night one title's id when OK is pressed on it. OK opens the title in its
+ * app where there is a link to it. Every answer is cached for cache_hours.
  */
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
@@ -77,7 +78,7 @@ public class MainActivity extends Activity {
     private boolean loading;
     /** When the rows were last filled; they are kept as they are (and the focus with them) until the cache is stale. */
     private long loadedAt;
-    /** The services TMDb or DRTV can give titles for; set by the first load, read by the genre tabs. */
+    /** The services TMDb, DRTV or Viaplay can give titles for; set by the first load, read by the genre tabs. */
     private volatile List<Suggestions.Service> found = Collections.emptyList();
     private final Map<String, Set<Integer>> streams = new ConcurrentHashMap<>();
     /** Wikidata's Netflix and Disney+ ids by title, kept on disk for cache_hours; see linkIds. */
@@ -690,9 +691,10 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Opens the title in the first of its services that has a link to it (Netflix, Disney+, DRTV, Viaplay), else
-     * the first installed app at its home screen. When none has a link yet and one of them is HBO Max, Netflix,
-     * Disney+ or Prime Video, Movie of the Night is asked first, once per title: one request per press, never while browsing.
+     * Opens the title in the first of its services that has a link to it (Netflix, Disney+, HBO Max, Prime Video,
+     * DRTV, Viaplay), else the first installed app at its home screen. When none has a link yet and one of them is
+     * HBO Max, Netflix, Disney+ or Prime Video, Movie of the Night is asked first, once per title: one request per
+     * press, never while browsing.
      */
     private void open(Suggestions.Title t) {
         PackageManager pm = getPackageManager();
