@@ -30,19 +30,21 @@ want it, another.
 
 1. Make a free TMDb account and ask for an API key at <https://www.themoviedb.org/settings/api>. Either the
    v3 "API Key" or the v4 "API Read Access Token" works.
-2. Put it in `local.properties` in the project folder. Git ignores that file, so the key stays out of the repo.
+2. Optional: make a free account at [Movie of the Night](https://developers.movieofthenight.com/) and copy
+   the API key from its dashboard (the free plan is enough). With it, OK opens the title itself on HBO Max, and
+   on Netflix and Disney+ for titles Wikidata has no id for. Without it, those open at the app's home screen.
+3. Put the keys in `local.properties` in the project folder. Git ignores that file, so the keys stay out of the
+   repo.
 
    ```properties
    sdk.dir=/path/to/Android/Sdk
-   tmdb.key=<your key>
+   tmdb.key=<your TMDb key>
+   # optional
+   motn.key=<your Movie of the Night key>
    ```
 
-   Or set `TMDB_KEY` in the environment when you build.
-
-   Optionally, add a [Movie of the Night](https://developers.movieofthenight.com/) key (its free plan is
-   enough) as `motn.key=<key>` (or `MOTN_KEY`). With it, OK opens the title itself on HBO Max, and on Netflix
-   and Disney+ for titles Wikidata has no id for. Without it, those open at the app's home screen.
-3. Pick your services in [`app/src/main/res/values/config.xml`](app/src/main/res/values/config.xml), one line
+   Or set `TMDB_KEY` and `MOTN_KEY` in the environment when you build. The keys are compiled into the APK.
+4. Pick your services in [`app/src/main/res/values/config.xml`](app/src/main/res/values/config.xml), one line
    per subscription, in the order their titles are mixed:
 
    ```xml
