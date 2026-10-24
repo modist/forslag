@@ -119,6 +119,33 @@ public class SuggestionsTest {
     }
 
     @Test
+    public void detailsReadSeasonsForSeriesAndTheFirstActors() throws Exception {
+        Suggestions.Title from = title(124364);
+        from.tv = true;
+        assertEquals("/tv/124364?append_to_response=aggregate_credits&language=da-DK",
+                Suggestions.detailsPath(from, "da-DK"));
+        JSONObject series = new JSONObject("{\"number_of_seasons\":3,\"number_of_episodes\":30,"
+                + "\"aggregate_credits\":{\"cast\":[{\"name\":\"Harold Perrineau\"},{\"name\":\"Catalina Sandino Moreno\"},"
+                + "{\"name\":\" \"},{\"name\":\"Harold Perrineau\"},{\"name\":\"Eion Bailey\"}]}}");
+        Suggestions.Details d = Suggestions.parseDetails(series, true, 2);
+        assertEquals(3, d.seasons);
+        assertEquals(30, d.episodes);
+        assertEquals(Arrays.asList("Harold Perrineau", "Catalina Sandino Moreno"), d.cast);
+        // Blank and repeated names are skipped.
+        assertEquals(Arrays.asList("Harold Perrineau", "Catalina Sandino Moreno", "Eion Bailey"),
+                Suggestions.parseDetails(series, true, 5).cast);
+
+        // A movie's cast is under credits, and it has no seasons.
+        JSONObject movie = new JSONObject("{\"number_of_seasons\":9,\"runtime\":152,\"credits\":{\"cast\":[{\"name\":\"Christian Bale\"}]}}");
+        Suggestions.Details m = Suggestions.parseDetails(movie, false, 5);
+        assertEquals(0, m.seasons);
+        assertEquals(152, m.runtime);
+        assertEquals(0, d.runtime);
+        assertEquals(Arrays.asList("Christian Bale"), m.cast);
+        assertTrue(Suggestions.parseDetails(new JSONObject("{}"), false, 5).cast.isEmpty());
+    }
+
+    @Test
     public void flatrateReadsOnlyTheRegionsSubscriptions() throws Exception {
         JSONObject json = new JSONObject("{\"results\":{\"DK\":{\"buy\":[{\"provider_id\":76}],"
                 + "\"flatrate\":[{\"provider_id\":337}]},\"SE\":{\"flatrate\":[{\"provider_id\":76}]}}}");

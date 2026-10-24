@@ -10,8 +10,18 @@
     <string name="no_services">Ingen af dine tjenester blev fundet på TMDb.</string>
     <string name="unmatched">Ikke på TMDb: %1$s</string>
     <string name="updated">Opdateret %1$s</string>
-    <string name="watch_on">Se på %1$s</string>
     <string name="back">Tilbage</string>
+    <plurals name="seasons">
+        <item quantity="one">%d sæson</item>
+        <item quantity="other">%d sæsoner</item>
+    </plurals>
+    <plurals name="episodes">
+        <item quantity="one">%d afsnit</item>
+        <item quantity="other">%d afsnit</item>
+    </plurals>
+    <string name="runtime_hours">%1$d t %2$d min</string>
+    <string name="runtime_minutes">%1$d min</string>
+    <string name="cast">Medvirkende: %1$s</string>
     <string name="not_installed">%1$s er ikke installeret</string>
     <string name="empty_genre">Ingen titler i denne genre på dine tjenester lige nu.</string>
     <string name="top_rated">★ Højt vurderet (%1$s+)</string>

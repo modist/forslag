@@ -70,6 +70,8 @@ final class Suggestions {
         /** Links to the title by app package, from Movie of the Night, once asked (see motnPath). */
         final Map<String, String> links = new HashMap<>();
         boolean linksAsked;
+        /** Seasons and cast for the detail page, from detailsPath; null until a detail page has asked. */
+        Details details;
         final List<Service> services = new ArrayList<>();
         /** TMDb's genre ids, and DR's and Viaplay's genre words (lower case), for the genre tabs. */
         final Set<Integer> genres = new HashSet<>();
@@ -253,6 +255,37 @@ final class Suggestions {
     /** Where one title can be watched, in every country. */
     static String watchPath(Title t) {
         return "/" + (t.tv ? "tv" : "movie") + "/" + t.id + "/watch/providers";
+    }
+
+    /** What the detail page adds to a title: a series' seasons and episodes, a movie's runtime, and the first actors. */
+    static final class Details {
+        /** runtime is in minutes. */
+        int seasons, episodes, runtime;
+        final List<String> cast = new ArrayList<>();
+    }
+
+    /** A title's details and cast in one request; a series' aggregate_credits counts the actors of every season. */
+    static String detailsPath(Title t, String language) {
+        return "/" + (t.tv ? "tv" : "movie") + "/" + t.id + "?append_to_response="
+                + (t.tv ? "aggregate_credits" : "credits") + "&language=" + language;
+    }
+
+    static Details parseDetails(JSONObject json, boolean tv, int castMax) {
+        Details d = new Details();
+        if (tv) {
+            d.seasons = json.optInt("number_of_seasons");
+            d.episodes = json.optInt("number_of_episodes");
+        } else {
+            d.runtime = json.optInt("runtime");
+        }
+        JSONObject credits = json.optJSONObject(tv ? "aggregate_credits" : "credits");
+        JSONArray cast = credits == null ? null : credits.optJSONArray("cast");
+        for (int i = 0; cast != null && i < cast.length() && d.cast.size() < castMax; i++) {
+            JSONObject p = cast.optJSONObject(i);
+            String name = p == null ? "" : p.optString("name", "").trim();
+            if (!name.isEmpty() && !d.cast.contains(name)) d.cast.add(name);
+        }
+        return d;
     }
 
     /** The providers that include a title in a subscription in one country, from /{type}/{id}/watch/providers. */

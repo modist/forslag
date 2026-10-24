@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
@@ -23,6 +24,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -61,6 +63,10 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
     private static final long BACKDROP_DELAY_MS = 300;
+    /** The width of the poster on the detail page, and of the buttons below it, in dp. */
+    private static final int POSTER_W = 180;
+    /** How many actors the detail page names. */
+    private static final int CAST_MAX = 6;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private int accent;
@@ -94,8 +100,8 @@ public class MainActivity extends Activity {
     /** The detail page OK on a title shows over the rows, until Back. */
     private FrameLayout detail;
     private ImageView detailBackdrop, detailPoster;
-    private TextView detailTitle, detailMeta, detailOverview, backButton;
-    /** One Watch button per service that has the title; Back is on the line below. */
+    private TextView detailTitle, detailMeta, detailCast, detailOverview, backButton;
+    /** The Watch buttons, one per service that has the title, and Back below them. */
     private LinearLayout detailButtons;
     /** The title on the detail page, and the tile the focus goes back to when it closes. */
     private Suggestions.Title detailOf;
@@ -336,7 +342,10 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
-    /** The detail page: a large backdrop, the poster, the whole plot, and the Watch and Back buttons. Hidden at first. */
+    /**
+     * The detail page: a large backdrop; on the left the poster with the Watch buttons and Back stacked below it, on
+     * the right the title, its details and the plot, which may run to the bottom of the screen. Hidden at first.
+     */
     private void buildDetail(FrameLayout root) {
         detail = new FrameLayout(this);
         detail.setBackgroundColor(0xFF000000);
@@ -345,111 +354,140 @@ public class MainActivity extends Activity {
         detailBackdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
         detailBackdrop.setAlpha(0.6f);
         detail.addView(detailBackdrop, new FrameLayout.LayoutParams(-1, -1));
+        // Dark behind the text, lighter to the right of it, where the backdrop shows.
         View shade = new View(this);
         shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[] {0xF2000000, 0xB3000000, 0x33000000}));
+                new int[] {0xF2000000, 0xD9000000, 0xB3000000, 0x33000000}));
         detail.addView(shade, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.HORIZONTAL);
-        // From the top, so the poster and the title line up however long the plot and however many the services.
-        body.setGravity(Gravity.TOP);
-        body.setPadding(dp(64), dp(56), dp(64), dp(32));
+        body.setPadding(dp(64), dp(48), dp(64), dp(40));
         detail.addView(body, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(dp(POSTER_W), -1);
+        llp.setMargins(0, 0, dp(40), 0);
+        body.addView(left, llp);
         detailPoster = new ImageView(this);
         detailPoster.setScaleType(ImageView.ScaleType.CENTER_CROP);
         detailPoster.setClipToOutline(true);
         GradientDrawable shape = new GradientDrawable();
         shape.setCornerRadius(dp(8));
         detailPoster.setBackground(shape);
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(200), dp(295));
-        plp.setMargins(0, 0, dp(40), 0);
-        body.addView(detailPoster, plp);
-
-        LinearLayout words = new LinearLayout(this);
-        words.setOrientation(LinearLayout.VERTICAL);
-        body.addView(words, new LinearLayout.LayoutParams(0, -2, 1f));
-        // The text takes half the screen, so the right of the backdrop shows; the buttons may run wider.
-        int half = Math.round(getResources().getDisplayMetrics().widthPixels * 0.5f);
-        detailTitle = text(30, Typeface.BOLD, 0xFFFFFFFF);
-        detailTitle.setMaxLines(2);
-        detailTitle.setEllipsize(TextUtils.TruncateAt.END);
-        words.addView(detailTitle, new LinearLayout.LayoutParams(half, -2));
-        detailMeta = oneLine(text(16, Typeface.NORMAL, accent));
-        detailMeta.setPadding(0, dp(8), 0, dp(16));
-        words.addView(detailMeta, new LinearLayout.LayoutParams(half, -2));
-        detailOverview = text(16, Typeface.NORMAL, 0xDDFFFFFF);
-        detailOverview.setMaxLines(5);
-        detailOverview.setEllipsize(TextUtils.TruncateAt.END);
-        detailOverview.setLineSpacing(0, 1.2f);
-        words.addView(detailOverview, new LinearLayout.LayoutParams(half, -2));
-
-        // Lines of Watch buttons, filled by fillButtons.
+        left.addView(detailPoster, new LinearLayout.LayoutParams(-1, dp(250)));
+        // The buttons scroll with the focus when a title is on more services than fit below the poster.
+        ScrollView scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, dp(18), 0, dp(4));
         detailButtons = new LinearLayout(this);
         detailButtons.setOrientation(LinearLayout.VERTICAL);
-        detailButtons.setPadding(0, dp(24), 0, 0);
-        words.addView(detailButtons, new LinearLayout.LayoutParams(-1, -2));
-        // Back on a line of its own, below the services.
+        scroll.addView(detailButtons);
+        left.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
         backButton = button();
         backButton.setText(R.string.back);
         backButton.setOnClickListener(v -> hideDetail());
-        LinearLayout.LayoutParams below = new LinearLayout.LayoutParams(-2, -2);
-        below.setMargins(0, dp(12), 0, 0);
-        words.addView(backButton, below);
+
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        // Half the screen: about 65 characters a line, which reads well from the sofa.
+        body.addView(words, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.5f), -1));
+        detailTitle = text(30, Typeface.BOLD, 0xFFFFFFFF);
+        detailTitle.setMaxLines(2);
+        detailTitle.setEllipsize(TextUtils.TruncateAt.END);
+        words.addView(detailTitle);
+        detailMeta = oneLine(text(16, Typeface.NORMAL, accent));
+        detailMeta.setPadding(0, dp(8), 0, dp(16));
+        words.addView(detailMeta);
+        // The actors, once TMDb has answered; hidden until then and for a title it knows none for.
+        detailCast = text(15, Typeface.NORMAL, 0xB3FFFFFF);
+        detailCast.setMaxLines(2);
+        detailCast.setEllipsize(TextUtils.TruncateAt.END);
+        detailCast.setLineSpacing(0, 1.15f);
+        detailCast.setPadding(0, 0, 0, dp(16));
+        words.addView(detailCast);
+        detailOverview = text(16, Typeface.NORMAL, 0xDDFFFFFF);
+        detailOverview.setEllipsize(TextUtils.TruncateAt.END);
+        detailOverview.setLineSpacing(0, 1.2f);
+        // The plot gets the rest of the height, down to the bottom border: as many lines as fit, then an ellipsis.
+        detailOverview.addOnLayoutChangeListener((v, l, top, r, bottom, ol, ot, or, ob) -> {
+            int lines = Math.max(1, (bottom - top) / detailOverview.getLineHeight());
+            if (detailOverview.getMaxLines() != lines) detailOverview.post(() -> detailOverview.setMaxLines(lines));
+        });
+        words.addView(detailOverview, new LinearLayout.LayoutParams(-1, 0, 1f));
         root.addView(detail, new FrameLayout.LayoutParams(-1, -1));
     }
 
-    /**
-     * The Watch buttons for t: one per service that has it, in the order of config.xml, on as many lines as the
-     * space right of the poster needs.
-     */
+    /** The buttons for t, stacked below the poster: Watch on each service that has it, in the order of config.xml, then Back. */
     private void fillButtons(Suggestions.Title t) {
         detailButtons.removeAllViews();
-        int room = getResources().getDisplayMetrics().widthPixels - dp(64 + 200 + 40 + 64);
-        LinearLayout line = null;
-        int used = 0;
         for (Suggestions.Service s : t.services) {
             if (s.pkg.isEmpty()) continue;
             TextView b = button();
-            b.setText(getString(R.string.watch_on, s.label()));
+            Drawable icon = appIcon(s.pkg);
+            if (icon == null) {
+                b.setText(getString(R.string.watch_on, s.label()));
+            } else {
+                b.setText(s.label());
+                b.setCompoundDrawablesRelative(icon, null, null, null);
+                b.setCompoundDrawablePadding(dp(10));
+            }
+            fitText(b, dp(POSTER_W) - b.getPaddingStart() - b.getPaddingEnd()
+                    - (icon == null ? 0 : dp(20) + b.getCompoundDrawablePadding()));
             b.setTag(s);
             b.setOnClickListener(v -> open(t, s));
-            b.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-            int width = b.getMeasuredWidth() + dp(12);
-            if (line == null || used + width > room) {
-                line = new LinearLayout(this);
-                line.setOrientation(LinearLayout.HORIZONTAL);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-                if (detailButtons.getChildCount() > 0) lp.setMargins(0, dp(12), 0, 0);
-                detailButtons.addView(line, lp);
-                used = 0;
-            }
-            LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
-            gap.setMargins(0, 0, dp(12), 0);
-            line.addView(b, gap);
-            used += width;
+            detailButtons.addView(b, stacked(dp(6)));
         }
+        if (backButton.getParent() != null) ((ViewGroup) backButton.getParent()).removeView(backButton);
+        detailButtons.addView(backButton, stacked(detailButtons.getChildCount() > 0 ? dp(12) : 0));
+    }
+
+    /** A smaller size, down to 12sp, for a service name too long for its button ("Amazon Prime Video"). */
+    private void fitText(TextView b, int room) {
+        float sp = 15;
+        while (sp > 12 && b.getPaint().measureText(b.getText().toString()) > room) {
+            sp -= 0.5f;
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        }
+    }
+
+    /** The app's own icon, button-sized, or null when it is not installed. */
+    private Drawable appIcon(String pkg) {
+        try {
+            Drawable d = getPackageManager().getApplicationIcon(pkg);
+            d.setBounds(0, 0, dp(20), dp(20));
+            return d;
+        } catch (PackageManager.NameNotFoundException e) {
+            return null;
+        }
+    }
+
+    /** A full-width place in the stack of buttons, below a gap. */
+    private LinearLayout.LayoutParams stacked(int gap) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        if (detailButtons.getChildCount() > 0) lp.setMargins(0, gap, 0, 0);
+        return lp;
     }
 
     /** The button the focus starts on: the first service whose app is installed, else the first service, else Back. */
     private View firstButton() {
         PackageManager pm = getPackageManager();
-        View first = null;
         for (int i = 0; i < detailButtons.getChildCount(); i++) {
-            LinearLayout line = (LinearLayout) detailButtons.getChildAt(i);
-            for (int j = 0; j < line.getChildCount(); j++) {
-                View b = line.getChildAt(j);
-                if (first == null) first = b;
-                if (intent(detailOf, (Suggestions.Service) b.getTag(), 2, pm) != null) return b;
+            View b = detailButtons.getChildAt(i);
+            if (b.getTag() instanceof Suggestions.Service && intent(detailOf, (Suggestions.Service) b.getTag(), 2, pm) != null) {
+                return b;
             }
         }
-        return first != null ? first : backButton;
+        return detailButtons.getChildAt(0);
     }
 
     /** A button on the detail page: filled with the accent while focused. */
     private TextView button() {
-        TextView b = text(15, Typeface.BOLD, 0xFFFFFFFF);
-        b.setPadding(dp(18), dp(8), dp(18), dp(8));
+        TextView b = oneLine(text(15, Typeface.BOLD, 0xFFFFFFFF));
+        b.setPadding(dp(16), dp(8), dp(16), dp(8));
+        b.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         b.setFocusable(true);
         StateListDrawable d = new StateListDrawable();
         d.addState(new int[] {android.R.attr.state_focused}, pill(accent, 0xFFFFFFFF));
@@ -465,7 +503,8 @@ public class MainActivity extends Activity {
         detailOf = t;
         returnTo = from;
         detailTitle.setText(t.name);
-        detailMeta.setText(metaLine(t));
+        showDetails(t);
+        if (t.details == null && t.id > 0) fetchDetails(t);
         detailOverview.setText(t.overview);
         detailOverview.setVisibility(t.overview.isEmpty() ? View.GONE : View.VISIBLE);
         detailPoster.setVisibility(t.poster.isEmpty() ? View.GONE : View.VISIBLE);
@@ -480,6 +519,47 @@ public class MainActivity extends Activity {
         detail.setVisibility(View.VISIBLE);
         content.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         firstButton().requestFocus();
+    }
+
+    /**
+     * The detail page's year and rating, with a series' seasons and episodes or a movie's runtime, and the cast, once
+     * they are known.
+     */
+    private void showDetails(Suggestions.Title t) {
+        String line = metaLine(t, false);
+        Suggestions.Details d = t.details;
+        if (d != null && d.seasons > 0) {
+            line += "  ·  " + getResources().getQuantityString(R.plurals.seasons, d.seasons, d.seasons);
+            if (d.episodes > 0) line += "  ·  " + getResources().getQuantityString(R.plurals.episodes, d.episodes, d.episodes);
+        }
+        if (d != null && d.runtime > 0) {
+            line += "  ·  " + (d.runtime >= 60 ? getString(R.string.runtime_hours, d.runtime / 60, d.runtime % 60)
+                    : getString(R.string.runtime_minutes, d.runtime));
+        }
+        detailMeta.setText(line);
+        boolean cast = d != null && !d.cast.isEmpty();
+        detailCast.setText(cast ? getString(R.string.cast, TextUtils.join(", ", d.cast)) : "");
+        detailCast.setVisibility(cast ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * Seasons or runtime, and cast, from TMDb: one request when a detail page opens (none while browsing), cached for cache_hours
+     * like every answer. Shown if the page still shows the title when the answer comes.
+     */
+    private void fetchDetails(Suggestions.Title t) {
+        new Thread(() -> {
+            Suggestions.Details d;
+            try {
+                d = Suggestions.parseDetails(tmdb.json(Suggestions.detailsPath(t, language)), t.tv, CAST_MAX);
+            } catch (Exception e) {
+                Log.w(TAG, "details " + t.id + ": " + e);
+                return;
+            }
+            main.post(() -> {
+                t.details = d;
+                if (t == detailOf && !isDestroyed()) showDetails(t);
+            });
+        }).start();
     }
 
     /** Back to the rows, on the tile the detail page came from (or the first, if the rows were filled meanwhile). */
@@ -854,20 +934,22 @@ public class MainActivity extends Activity {
         return tile;
     }
 
-    /** Year, rating and the services that have the title. */
-    private static String metaLine(Suggestions.Title t) {
+    /** Year and rating, and the services that have the title unless the detail page's buttons show them. */
+    private static String metaLine(Suggestions.Title t, boolean services) {
         List<String> parts = new ArrayList<>();
         if (!t.year.isEmpty()) parts.add(t.year);
         if (t.rating > 0) parts.add(String.format(Locale.ROOT, "★ %.1f", t.rating));
-        List<String> names = new ArrayList<>();
-        for (Suggestions.Service s : t.services) names.add(s.label());
-        parts.add(TextUtils.join(", ", names));
+        if (services) {
+            List<String> names = new ArrayList<>();
+            for (Suggestions.Service s : t.services) names.add(s.label());
+            parts.add(TextUtils.join(", ", names));
+        }
         return TextUtils.join("  ·  ", parts);
     }
 
     private void describe(Suggestions.Title t) {
         title.setText(t.name);
-        meta.setText(metaLine(t));
+        meta.setText(metaLine(t, true));
         overview.setText(t.overview);
         // Wait for the focus to settle before fetching a large picture while the D-pad is held.
         main.removeCallbacks(showBackdrop);
