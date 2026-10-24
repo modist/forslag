@@ -114,7 +114,8 @@ shown.
   narrower genres there are few.
 - **Opening a title directly** works on DRTV and Viaplay from their own catalogues. On Netflix and Disney+ it
   needs Wikidata's id for the title (most well-known titles, few new ones) or a Movie of the Night key, and on
-  HBO Max and Prime Video the key. TV 2 Play and YouSee open at their home screen: TV 2 Play's app opens a title
+  HBO Max and Prime Video the key; when Movie of the Night has no link for a title there, OK opens the app's
+  search for the title instead. TV 2 Play and YouSee open at their home screen: TV 2 Play's app opens a title
   only from inside itself (its title screen is not exported to other apps, and its one public link,
   `tv2play.dk/start`, opens the front page). Netflix, Disney+ and Prime Video ask for a profile first when they
   were not already running.

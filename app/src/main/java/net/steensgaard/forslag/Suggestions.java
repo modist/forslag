@@ -457,6 +457,21 @@ final class Suggestions {
 
     static final String MOTN_API = "https://api.movieofthenight.com/v4";
 
+    /** A search for the title in the app, for the apps that take a search link; null for the others. */
+    static String searchUrl(String pkg, String name) {
+        String q;
+        try {
+            q = java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return null;
+        }
+        switch (pkg) {
+            case PRIME: return "https://app.primevideo.com/search?phrase=" + q;
+            case HBO: return "https://play.hbomax.com/search/result?q=" + q;
+            default: return null;
+        }
+    }
+
     /** Movie of the Night's id for a service whose title links it knows, or null. */
     static String motnService(String pkg) {
         switch (pkg) {

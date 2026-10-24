@@ -272,7 +272,7 @@ public class MainActivity extends Activity {
         header.setOrientation(LinearLayout.VERTICAL);
         top.addView(header, new FrameLayout.LayoutParams(-1, -1));
         title = oneLine(text(30, Typeface.BOLD, 0xFFFFFFFF));
-        header.addView(title, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.7f), -2));
+        header.addView(title, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.6f), -2));
         topToggle = text(13, Typeface.NORMAL, 0xFFFFFFFF);
         topToggle.setText(getString(R.string.top_rated, getString(R.string.top_rated_min)));
         topToggle.setPadding(dp(12), dp(4), dp(12), dp(4));
@@ -723,11 +723,12 @@ public class MainActivity extends Activity {
                 return;
             }
         }
-        for (boolean direct : new boolean[] {true, false}) {
+        // First a link to the title itself, then the app's search for it (Prime Video, HBO Max), then the app.
+        for (int step = 0; step < 3; step++) {
             for (Suggestions.Service s : t.services) {
                 if (s.pkg.isEmpty()) continue;
-                Intent i = direct ? link(t, s) : pm.getLeanbackLaunchIntentForPackage(s.pkg);
-                if (i == null && !direct) i = pm.getLaunchIntentForPackage(s.pkg);
+                Intent i = step == 0 ? link(t, s) : step == 1 ? search(t, s) : pm.getLeanbackLaunchIntentForPackage(s.pkg);
+                if (i == null && step == 2) i = pm.getLaunchIntentForPackage(s.pkg);
                 if (i == null || i.resolveActivity(pm) == null) continue;
                 try {
                     startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
@@ -769,6 +770,16 @@ public class MainActivity extends Activity {
         // Netflix opens the title only when it is told where the link came from.
         if (s.pkg.equals(Suggestions.NETFLIX)) i.putExtra("source", "30");
         return i;
+    }
+
+    /**
+     * The app's search for the title, where the app takes a search link (tested: Prime Video, HBO Max), for a title
+     * without a link of its own. Better than the app itself, which comes back on whatever it showed last.
+     */
+    private static Intent search(Suggestions.Title t, Suggestions.Service s) {
+        String url = Suggestions.searchUrl(s.pkg, t.name);
+        return url == null ? null : new Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(s.pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
     }
 
     private LinearLayout row(LinearLayout col) {

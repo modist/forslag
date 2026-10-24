@@ -310,6 +310,15 @@ public class SuggestionsTest {
         assertEquals(Arrays.asList(a, b, c, d), row);
     }
 
+    @Test
+    public void searchLinksForPrimeAndHboOnly() {
+        assertEquals("https://app.primevideo.com/search?phrase=The%20Joy%20of%20Painting",
+                Suggestions.searchUrl(Suggestions.PRIME, "The Joy of Painting"));
+        assertEquals("https://play.hbomax.com/search/result?q=R%C3%B8d%20%26%20Hvid",
+                Suggestions.searchUrl(Suggestions.HBO, "Rød & Hvid"));
+        assertNull(Suggestions.searchUrl(Suggestions.NETFLIX, "Animals"));
+    }
+
     private static Suggestions.Genre genre(String key) {
         for (Suggestions.Genre g : Suggestions.GENRES) if (g.key.equals(key)) return g;
         throw new AssertionError(key);
