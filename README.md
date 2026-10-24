@@ -2,7 +2,7 @@
 
 What is included in your own streaming subscriptions right now, on one Android TV screen.
 
-![Forslag on a Philips Android TV: genre tabs and a row of comedies above a row of series](screenshot.jpg)
+![Forslag on a Philips Android TV: The Dark Knight focused in the movie row, genre tabs, Sort and Top rated](screenshot.jpg)
 
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action, Sci-fi &
