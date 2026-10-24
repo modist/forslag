@@ -6,12 +6,13 @@ What is included in your own streaming subscriptions right now, on one Android T
 
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action, Sci-fi &
-fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that genre.
-A **★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in
-both rows, and is remembered. Next to it, **Sort** cycles Popular, Newest (release date) and Rating with OK; it re-orders
-the titles the rows already hold, so it is instant and asks no server. Focus a title to see its year, rating,
-plot and which of your services has it. Press OK to open it: Netflix, Disney+, HBO Max, Prime Video, DRTV and
-Viaplay open the title itself where there is a link to it, and the other services open at their home screen.
+fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that genre. A
+**★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in both
+rows, and is remembered. Next to it, **Sort** cycles Popular, Newest (release date) and Rating with OK; it
+re-orders the titles the rows already hold, so it is instant and asks no server. Focus a title to see its
+year, rating, plot and which of your services has it. Press OK to open it: Netflix, Disney+, HBO Max, Prime
+Video, DRTV and Viaplay open the title itself where there is a link to it, and the other services open at
+their home screen.
 
 It is an ordinary Android TV app (Android 8 and later), and it also declares a module card for the
 [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher, so it can sit in that launcher's dock
