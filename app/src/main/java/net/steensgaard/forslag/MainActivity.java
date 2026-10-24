@@ -611,8 +611,8 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * A link the app opens the title from, as tested on a Philips Android TV; null when there is no id. A running
-     * app ignores a link sent to the screen it is on, so CLEAR_TOP makes it open that screen afresh with the link.
+     * A link the app opens the title from, as tested on a Philips Android TV; null when there is no id. Netflix,
+     * Disney+ and HBO Max ignore a link sent to the screen they are on, so CLEAR_TOP opens that screen afresh.
      */
     private static Intent link(Suggestions.Title t, Suggestions.Service s) {
         String url;
@@ -629,8 +629,9 @@ public class MainActivity extends Activity {
         } else {
             return null;
         }
-        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(s.pkg)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(s.pkg);
+        // DRTV takes a link on the screen it is on, but restarts at its front page when that screen is cleared.
+        if (!s.pkg.equals(Suggestions.DRTV)) i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         // Netflix opens the title only when it is told where the link came from.
         if (s.pkg.equals(Suggestions.NETFLIX)) i.putExtra("source", "30");
         return i;
