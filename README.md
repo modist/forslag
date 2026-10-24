@@ -6,7 +6,9 @@ What is included in your own streaming subscriptions right now, on one Android T
 
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action,
-Sci-fi & fantasy, Documentary, Entertainment (series), Family & kids and Animation. Focus a title to see its year,
+Sci-fi & fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that
+genre. A **★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`)
+in both rows, and is remembered. Focus a title to see its year,
 rating, plot and which of your services has it. Press OK to open it: Netflix, Disney+, HBO Max, Prime Video, DRTV
 and Viaplay open the title itself where there is a link to it, and the other services open at their home screen.
 
@@ -90,16 +92,19 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 | `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press OK on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
-No background service, no telemetry, no ads, no account. Answers and posters are cached in the app's cache
-folder for six hours (`cache_hours` in `config.xml`); opening the app again within that time sends nothing.
-When a source can't be reached, the last answers are shown.
+No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
+picture is cached for 76 hours (`cache_hours` in `config.xml`), Wikidata's ids are kept per title, a genre is
+fetched only when you press OK on its tab, and Movie of the Night is asked only when you press OK on a title.
+Opening the app again within that time sends nothing. When a source can't be reached, the last answers are
+shown.
 
 ## Limits
 
 - **The first load is slow.** TMDb's subscription filter also lets through titles a service only rents or
   sells (on Viaplay, 18 of the top 20 "subscription" movies were rentals), so each TMDb title's availability is
   checked before it is shown. A first load sends about 150 small requests and took about 50 seconds on the test
-  TV. After that the cache answers, and a genre tab takes a few seconds the first time it is chosen.
+  TV. After that the cache answers for 76 hours, and a genre tab takes a few seconds the first time it is
+  chosen.
 - **DRTV and Viaplay use unofficial APIs.** They are the services' own, but undocumented, and can change
   without notice. If one fails, the rows simply have no titles from it.
 - **DRTV in the genre tabs.** DR's lists are not by genre, so a tab keeps the DR titles DR tags with it; in the
@@ -111,8 +116,10 @@ When a source can't be reached, the last answers are shown.
   opens the front page). Netflix and Disney+ ask for a profile first
   when they were not already running.
 - **Quality filter.** Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles
-  that are popular elsewhere but unknown here.
-- **Freshness.** TMDb's availability data is JustWatch's and can lag a day or two behind a service's catalogue.
+  that are popular elsewhere but unknown here. With ★ Top rated on, TMDb's rating counts (IMDb's for Viaplay
+  titles); DR gives none, so DRTV-only titles drop out then.
+- **Freshness.** Lists can be up to 76 hours old.
+- **Availability.** TMDb's availability data is JustWatch's and can lag a day or two behind a service's catalogue.
   Plots are in the configured language where TMDb has one, and empty otherwise.
 
 ## Tested on

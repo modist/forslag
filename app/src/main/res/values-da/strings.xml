@@ -12,6 +12,7 @@
     <string name="updated">Opdateret %1$s</string>
     <string name="not_installed">%1$s er ikke installeret</string>
     <string name="empty_genre">Ingen titler i denne genre på dine tjenester lige nu.</string>
+    <string name="top_rated">★ Højt vurderet (%1$s+)</string>
     <string name="genre_all">Alle</string>
     <string name="genre_drama">Drama</string>
     <string name="genre_comedy">Komedie</string>

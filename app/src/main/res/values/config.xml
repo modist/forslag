@@ -32,8 +32,11 @@
     <!-- Leave out titles with fewer TMDb votes: keeps out titles that are popular elsewhere but unknown here.
          Danish titles get few votes; 50 still leaves DR TV about 30 movies and 30 series. -->
     <integer name="min_votes">50</integer>
-    <!-- How long TMDb answers and posters are kept before they are fetched again, in hours. -->
-    <integer name="cache_hours">6</integer>
+    <!-- The lowest rating "Top rated" keeps (TMDb's, or IMDb's for Viaplay titles; DR gives none). -->
+    <string name="top_rated_min" translatable="false">7.0</string>
+    <!-- How long every answer (lists, availability, links) and every picture is kept before it is fetched again,
+         in hours. Long on purpose: few calls to the APIs, at the price of lists up to three days old. -->
+    <integer name="cache_hours">76</integer>
 
     <color name="accent">#E0A82E</color>
 </resources>

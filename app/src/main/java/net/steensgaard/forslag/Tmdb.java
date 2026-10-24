@@ -31,6 +31,7 @@ final class Tmdb {
 
     private final String key;
     private final File dir;
+    /** How long an answer or an image stays fresh: cache_hours in config.xml. */
     private final long freshMs;
 
     Tmdb(String key, File cacheDir, int hours) {
@@ -41,30 +42,30 @@ final class Tmdb {
     }
 
     JSONObject json(String path) throws Exception {
-        return new JSONObject(new String(cached(API + path, true), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(API + path, true, null, null, freshMs), StandardCharsets.UTF_8));
     }
 
     /** JSON from any other server, without the key. */
     JSONObject open(String url) throws Exception {
-        return new JSONObject(new String(cached(url, false, null, null), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(url, false, null, null, freshMs), StandardCharsets.UTF_8));
     }
 
     /** JSON from a server that takes its own key in a header; the key is not part of the cache's file name. */
     JSONObject open(String url, String header, String value) throws Exception {
-        return new JSONObject(new String(cached(url, false, header, value), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(url, false, header, value, freshMs), StandardCharsets.UTF_8));
     }
 
     byte[] image(String url) throws Exception {
-        return cached(url, false, null, null);
+        return cached(url, false, null, null, freshMs);
     }
 
-    private byte[] cached(String url, boolean api) throws Exception {
-        return cached(url, api, null, null);
+    long freshMs() {
+        return freshMs;
     }
 
-    private byte[] cached(String url, boolean api, String header, String value) throws Exception {
+    private byte[] cached(String url, boolean api, String header, String value, long maxAgeMs) throws Exception {
         File f = new File(dir, sha1(url));
-        if (f.exists() && System.currentTimeMillis() - f.lastModified() < freshMs) return read(new FileInputStream(f));
+        if (f.exists() && System.currentTimeMillis() - f.lastModified() < maxAgeMs) return read(new FileInputStream(f));
         try {
             byte[] body = fetch(url, api, header, value);
             File tmp = new File(dir, f.getName() + ".tmp");

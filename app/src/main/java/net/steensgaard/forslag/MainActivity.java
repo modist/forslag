@@ -2,6 +2,7 @@ package net.steensgaard.forslag;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
@@ -27,6 +28,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -53,8 +56,6 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
     private static final long BACKDROP_DELAY_MS = 300;
-    /** A genre tab is chosen once the focus has rested on it this long, or at once with OK. */
-    private static final long TAB_DELAY_MS = 450;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private int accent;
@@ -65,12 +66,20 @@ public class MainActivity extends Activity {
     private Section movies, series;
     private String region, language;
     private int perRow, minVotes;
+    /** "Top rated" on: only titles rated at least topMin, in both rows. Kept between launches. */
+    private volatile boolean topRated;
+    private double topMin;
+    private SharedPreferences prefs;
+    private TextView topToggle;
     private boolean loading;
     /** When the rows were last filled; they are kept as they are (and the focus with them) until the cache is stale. */
     private long loadedAt;
     /** The services TMDb or DRTV can give titles for; set by the first load, read by the genre tabs. */
     private volatile List<Suggestions.Service> found = Collections.emptyList();
     private final Map<String, Set<Integer>> streams = new ConcurrentHashMap<>();
+    /** Wikidata's Netflix and Disney+ ids by title, kept on disk for cache_hours; see linkIds. */
+    private final Object idsLock = new Object();
+    private JSONObject ids;
     private String pendingBackdrop = "";
     private final Runnable showBackdrop = () -> images.load(backdrop, pendingBackdrop);
 
@@ -81,9 +90,10 @@ public class MainActivity extends Activity {
         final List<TextView> tabs = new ArrayList<>();
         final Map<String, List<Suggestions.Title>> fetched = new HashMap<>();
         Suggestions.Genre genre;
+        /** The key of the row on screen (genre and filter), or null while one is loading. */
+        String showing;
         /** Bumped on every choice, so a slow answer for a tab that was left is dropped. */
         int generation;
-        Runnable pending;
 
         Section(LinearLayout col, boolean tv, int label) {
             this.tv = tv;
@@ -120,14 +130,7 @@ public class MainActivity extends Activity {
             // Usable once the first load knows the services.
             t.setFocusable(false);
             t.setTag(g);
-            t.setOnFocusChangeListener((v, focused) -> {
-                if (pending != null) main.removeCallbacks(pending);
-                pending = null;
-                if (focused) {
-                    pending = () -> choose(g);
-                    main.postDelayed(pending, TAB_DELAY_MS);
-                }
-            });
+            // A genre is fetched only on OK, so moving across the tabs costs no API calls.
             t.setOnClickListener(v -> choose(g));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(0, 0, dp(6), 0);
@@ -147,29 +150,32 @@ public class MainActivity extends Activity {
         void reset() {
             fetched.clear();
             genre = null;
+            showing = null;
             generation++;
             mark();
         }
 
         void choose(Suggestions.Genre g) {
-            if (pending != null) main.removeCallbacks(pending);
-            pending = null;
-            if (g == genre && fetched.containsKey(key(g))) return;
+            final boolean top = topRated;
+            final String key = key(g, top);
+            if (key.equals(showing)) return;
             genre = g;
             mark();
-            List<Suggestions.Title> known = fetched.get(key(g));
+            List<Suggestions.Title> known = fetched.get(key);
             if (known != null) {
                 fill(this, known);
+                showing = key;
                 return;
             }
+            showing = null;
             final int asked = ++generation;
             placeholder(this, R.string.loading);
             new Thread(() -> {
                 List<Suggestions.Title> titles;
                 try {
-                    titles = buildRow(tv, g);
+                    titles = buildRow(tv, g, top);
                 } catch (Exception e) {
-                    Log.w(TAG, "genre " + key(g) + ": " + e);
+                    Log.w(TAG, "genre " + key + ": " + e);
                     titles = null;
                 }
                 final List<Suggestions.Title> result = titles;
@@ -179,15 +185,25 @@ public class MainActivity extends Activity {
                         placeholder(this, R.string.offline);
                         return;
                     }
-                    fetched.put(key(g), result);
+                    fetched.put(key, result);
                     fill(this, result);
+                    showing = key;
                 });
             }).start();
         }
     }
 
-    private static String key(Suggestions.Genre g) {
-        return g == null ? "all" : g.key;
+    /** What a section keeps a fetched row under: its genre, and whether only top rated titles were asked for. */
+    private static String key(Suggestions.Genre g, boolean top) {
+        return (g == null ? "all" : g.key) + (top ? ":top" : "");
+    }
+
+    /** Turns "Top rated" on or off and fetches both rows again, each in the genre it shows. */
+    private void toggleTopRated() {
+        topRated = !topRated;
+        topToggle.setSelected(topRated);
+        prefs.edit().putBoolean("top_rated", topRated).apply();
+        for (Section s : new Section[] {movies, series}) s.choose(s.genre);
     }
 
     @Override
@@ -200,6 +216,9 @@ public class MainActivity extends Activity {
         language = getString(R.string.language);
         perRow = getResources().getInteger(R.integer.per_row);
         minVotes = getResources().getInteger(R.integer.min_votes);
+        topMin = Double.parseDouble(getString(R.string.top_rated_min));
+        prefs = getSharedPreferences("forslag", MODE_PRIVATE);
+        topRated = prefs.getBoolean("top_rated", false);
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
@@ -224,11 +243,23 @@ public class MainActivity extends Activity {
         col.setClipChildren(false);
         root.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
+        FrameLayout top = new FrameLayout(this);
+        col.addView(top, new LinearLayout.LayoutParams(-1, dp(112)));
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
-        col.addView(header, new LinearLayout.LayoutParams(-1, dp(112)));
+        top.addView(header, new FrameLayout.LayoutParams(-1, -1));
         title = oneLine(text(30, Typeface.BOLD, 0xFFFFFFFF));
-        header.addView(title);
+        header.addView(title, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.7f), -2));
+        topToggle = text(13, Typeface.NORMAL, 0xFFFFFFFF);
+        topToggle.setText(getString(R.string.top_rated, getString(R.string.top_rated_min)));
+        topToggle.setPadding(dp(12), dp(4), dp(12), dp(4));
+        topToggle.setBackground(tabBackground());
+        topToggle.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_selected}, {}},
+                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        topToggle.setSelected(topRated);
+        topToggle.setFocusable(false);
+        topToggle.setOnClickListener(v -> toggleTopRated());
+        top.addView(topToggle, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
         meta = oneLine(text(15, Typeface.NORMAL, accent));
         meta.setPadding(0, dp(6), 0, dp(8));
         header.addView(meta);
@@ -270,6 +301,7 @@ public class MainActivity extends Activity {
 
     /** Everything that comes back from one load, built off the main thread. */
     private static final class Result {
+        boolean top;
         List<Suggestions.Title> movies = new ArrayList<>(), series = new ArrayList<>();
         List<String> unmatched = new ArrayList<>();
         int error;
@@ -287,8 +319,10 @@ public class MainActivity extends Activity {
             Suggestions.Service s = Suggestions.parseService(line);
             if (s != null) services.add(s);
         }
+        final boolean top = topRated;
         new Thread(() -> {
             Result r = new Result();
+            r.top = top;
             try {
                 // A service can be on TMDb's movie list, its TV list or both.
                 for (boolean tv : new boolean[] {false, true}) {
@@ -301,8 +335,8 @@ public class MainActivity extends Activity {
                     else r.unmatched.add(s.names[0]);
                 }
                 found = usable;
-                r.movies = buildRow(false, null);
-                r.series = buildRow(true, null);
+                r.movies = buildRow(false, null, top);
+                r.series = buildRow(true, null, top);
                 if (usable.isEmpty()) r.error = R.string.no_services;
                 else if (r.movies.isEmpty() && r.series.isEmpty()) r.error = R.string.nothing;
             } catch (Tmdb.KeyRefused e) {
@@ -319,7 +353,8 @@ public class MainActivity extends Activity {
      * One row: each service's titles (of one genre, or all), mixed in turns, with the TMDb titles checked against
      * what each service really streams, and links looked up. Runs off the main thread.
      */
-    private List<Suggestions.Title> buildRow(boolean tv, Suggestions.Genre genre) throws Exception {
+    private List<Suggestions.Title> buildRow(boolean tv, Suggestions.Genre genre, boolean top) throws Exception {
+        double minRating = top ? topMin : 0;
         List<Suggestions.Service> services = found;
         List<List<Suggestions.Title>> lists = new ArrayList<>();
         for (Suggestions.Service s : services) {
@@ -334,13 +369,15 @@ public class MainActivity extends Activity {
                     l = viaplay(tv, genre);
                 } else {
                     l = Suggestions.parseDiscover(tmdb.json(
-                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre)), tv);
+                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre, minRating)), tv);
                 }
             } catch (Tmdb.KeyRefused e) {
                 throw e;
             } catch (Exception e) {
                 Log.w(TAG, "list " + s.label() + ": " + e);
             }
+            // TMDb was asked for these ratings already; DR's and Viaplay's own lists are filtered here.
+            if (minRating > 0 && s.own()) l = Suggestions.rated(l, minRating);
             lists.add(l);
         }
         // Each service's share of the row, plus a few for titles that turn out to be rentals, checked in parallel;
@@ -393,22 +430,78 @@ public class MainActivity extends Activity {
      * One query per row; without an answer OK opens the app.
      */
     private void linkIds(List<Suggestions.Title> row) {
-        List<Suggestions.Title> wanted = new ArrayList<>();
-        for (Suggestions.Title t : row) {
-            for (Suggestions.Service s : t.services) {
-                if (t.id > 0 && (s.pkg.equals(Suggestions.NETFLIX) || s.pkg.equals(Suggestions.DISNEY))) {
-                    wanted.add(t);
-                    break;
+        long now = System.currentTimeMillis();
+        List<Suggestions.Title> ask = new ArrayList<>();
+        synchronized (idsLock) {
+            JSONObject known = ids();
+            for (Suggestions.Title t : row) {
+                if (t.id <= 0) continue;
+                boolean wanted = false;
+                for (Suggestions.Service s : t.services) {
+                    wanted |= s.pkg.equals(Suggestions.NETFLIX) || s.pkg.equals(Suggestions.DISNEY);
+                }
+                if (!wanted) continue;
+                JSONObject e = known.optJSONObject(idKey(t));
+                if (e != null && now - e.optLong("at") < tmdb.freshMs()) {
+                    t.netflixId = e.optString("n", "");
+                    t.disneyId = e.optString("d", "");
+                } else {
+                    ask.add(t);
                 }
             }
         }
-        if (wanted.isEmpty()) return;
+        if (ask.isEmpty()) return;
         try {
             Suggestions.applyWikidata(tmdb.open("https://query.wikidata.org/sparql?format=json&query="
-                    + URLEncoder.encode(Suggestions.wikidataQuery(wanted), "UTF-8")), wanted);
+                    + URLEncoder.encode(Suggestions.wikidataQuery(ask), "UTF-8")), ask);
+            synchronized (idsLock) {
+                JSONObject known = ids();
+                for (Suggestions.Title t : ask) {
+                    known.put(idKey(t), new JSONObject().put("n", t.netflixId).put("d", t.disneyId).put("at", now));
+                }
+                saveIds(now);
+            }
         } catch (Exception e) {
             Log.w(TAG, "wikidata: " + e);
         }
+    }
+
+    private static String idKey(Suggestions.Title t) {
+        return (t.tv ? "t" : "m") + t.id;
+    }
+
+    /** The Netflix and Disney+ ids asked so far, by title, also "none"; read from disk once. */
+    private JSONObject ids() {
+        if (ids == null) {
+            try {
+                ids = new JSONObject(new String(Files.readAllBytes(idsFile().toPath()), StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                ids = new JSONObject();
+            }
+        }
+        return ids;
+    }
+
+    /** Writes the ids back, without the ones older than cache_hours, through a temporary file. */
+    private void saveIds(long now) {
+        try {
+            JSONObject keep = new JSONObject();
+            for (java.util.Iterator<String> it = ids.keys(); it.hasNext(); ) {
+                String k = it.next();
+                JSONObject e = ids.optJSONObject(k);
+                if (e != null && now - e.optLong("at") < tmdb.freshMs()) keep.put(k, e);
+            }
+            ids = keep;
+            File tmp = new File(getFilesDir(), "wikidata-ids.json.tmp");
+            Files.write(tmp.toPath(), keep.toString().getBytes(StandardCharsets.UTF_8));
+            if (!tmp.renameTo(idsFile())) tmp.delete();
+        } catch (Exception e) {
+            Log.w(TAG, "save ids: " + e);
+        }
+    }
+
+    private File idsFile() {
+        return new File(getFilesDir(), "wikidata-ids.json");
     }
 
     /** The providers that include t in a subscription here, or null when TMDb can't say. */
@@ -433,9 +526,11 @@ public class MainActivity extends Activity {
             loadedAt = System.currentTimeMillis();
             for (Section s : new Section[] {movies, series}) {
                 s.reset();
-                s.fetched.put(key(null), s.tv ? r.series : r.movies);
+                s.fetched.put(key(null, r.top), s.tv ? r.series : r.movies);
                 fill(s, s.tv ? r.series : r.movies);
+                s.showing = key(null, r.top);
                 s.enableTabs();
+                topToggle.setFocusable(true);
             }
             View first = movies.row.getChildCount() > 0 ? movies.row.getChildAt(0) : series.row.getChildAt(0);
             if (first != null) first.requestFocus();

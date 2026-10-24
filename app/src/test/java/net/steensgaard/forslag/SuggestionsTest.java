@@ -89,7 +89,7 @@ public class SuggestionsTest {
 
     @Test
     public void discoverAsksForSubscriptionTitlesInTheRegion() {
-        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null);
+        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null, 0);
         assertTrue(p.startsWith("/discover/tv?"));
         assertTrue(p.contains("watch_region=DK"));
         assertTrue(p.contains("with_watch_providers=8"));
@@ -205,8 +205,8 @@ public class SuggestionsTest {
         Suggestions.Genre fun = genre("entertainment");
         assertTrue(!fun.offered(false));
         assertTrue(fun.offered(true));
-        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, crime).contains("&with_genres=80%7C53"));
-        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, crime).contains("&with_genres=80%7C9648"));
+        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, crime, 0).contains("&with_genres=80%7C53"));
+        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, crime, 0).contains("&with_genres=80%7C9648"));
 
         JSONObject tmdb = new JSONObject("{\"results\":[{\"id\":1,\"title\":\"Heat\",\"genre_ids\":[28,53]}]}");
         Suggestions.Title heat = Suggestions.parseDiscover(tmdb, false).get(0);
@@ -282,6 +282,16 @@ public class SuggestionsTest {
         assertEquals("https://www.netflix.com/title/70021642/", links.get(Suggestions.NETFLIX));
         assertNull(Suggestions.motnService(Suggestions.VIAPLAY));
         assertTrue(Suggestions.parseMotn(new JSONObject("{}"), "DK").isEmpty());
+    }
+
+    @Test
+    public void topRatedAsksTmdbAndFiltersTheRest() {
+        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, null, 7.0).contains("&vote_average.gte=7.0"));
+        assertTrue(!Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, null, 0).contains("vote_average"));
+        Suggestions.Title good = title(1), poor = title(2), unrated = title(3);
+        good.rating = 7.4;
+        poor.rating = 6.9;
+        assertEquals(Arrays.asList(good), Suggestions.rated(Arrays.asList(good, poor, unrated), 7.0));
     }
 
     private static Suggestions.Genre genre(String key) {

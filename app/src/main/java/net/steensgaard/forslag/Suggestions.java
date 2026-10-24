@@ -214,11 +214,22 @@ final class Suggestions {
     }
 
     /** What is included in one subscription in one country, most popular first. */
-    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes, Genre genre) {
+    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes, Genre genre,
+            double minRating) {
         String genres = genre == null ? "" : "&with_genres=" + (tv ? genre.tvIds : genre.movieIds).replace("|", "%7C");
+        String rated = minRating > 0 ? "&vote_average.gte=" + minRating : "";
         return "/discover/" + (tv ? "tv" : "movie") + "?watch_region=" + region + "&with_watch_providers="
                 + providerId + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&include_adult=false"
-                + "&vote_count.gte=" + minVotes + genres + "&language=" + language + "&page=1";
+                + "&vote_count.gte=" + minVotes + rated + genres + "&language=" + language + "&page=1";
+    }
+
+    /** The titles rated at least min; a title without a rating (DR gives none) is left out. */
+    static List<Title> rated(List<Title> titles, double min) {
+        List<Title> out = new ArrayList<>();
+        for (Title t : titles) {
+            if (t.rating >= min) out.add(t);
+        }
+        return out;
     }
 
     /** Where one title can be watched, in every country. */
