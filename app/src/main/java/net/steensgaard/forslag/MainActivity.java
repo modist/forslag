@@ -692,9 +692,9 @@ public class MainActivity extends Activity {
 
     /**
      * Opens the title in the first of its services that has a link to it (Netflix, Disney+, HBO Max, Prime Video,
-     * DRTV, Viaplay), else the first installed app at its home screen. When none has a link yet and one of them is
-     * HBO Max, Netflix, Disney+ or Prime Video, Movie of the Night is asked first, once per title: one request per
-     * press, never while browsing.
+     * DRTV, Viaplay), else the search for it in Prime Video or HBO Max, else the first installed app at its home
+     * screen. When none has a link yet and one of them is HBO Max, Netflix, Disney+ or Prime Video, Movie of the
+     * Night is asked first, once per title: one request per press, never while browsing.
      */
     private void open(Suggestions.Title t) {
         PackageManager pm = getPackageManager();

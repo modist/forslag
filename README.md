@@ -11,8 +11,8 @@ fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on
 rows, and is remembered. Next to it, **Sort** cycles Popular, Newest (release date) and Rating with OK; it
 re-orders the titles the rows already hold, so it is instant and asks no server. Focus a title to see its
 year, rating, plot and which of your services has it. Press OK to open it: Netflix, Disney+, HBO Max, Prime
-Video, DRTV and Viaplay open the title itself where there is a link to it, and the other services open at
-their home screen.
+Video, DRTV and Viaplay open the title itself where there is a link to it; without one, Prime Video and HBO
+Max open their search for the title, and the other services their home screen.
 
 It is an ordinary Android TV app (Android 8 and later), and it also declares a module card for the
 [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher, so it can sit in that launcher's dock
@@ -36,8 +36,9 @@ want it, another.
    v3 "API Key" or the v4 "API Read Access Token" works.
 2. Optional: make a free account at [Movie of the Night](https://developers.movieofthenight.com/) and copy the
    API key from its dashboard (the free plan is enough). With it, OK opens the title itself on HBO Max and
-   Prime Video, and on Netflix and Disney+ for titles Wikidata has no id for. Without it, those open at the
-   app's home screen.
+   Prime Video, and on Netflix and Disney+ for titles Wikidata has no id for. Without it, HBO Max and Prime
+   Video open their search for the title, and Netflix and Disney+ (for titles Wikidata lacks) the app's home
+   screen.
 3. Put the keys in `local.properties` in the project folder. Git ignores that file, so the keys stay out of the
    repo.
 
@@ -129,9 +130,10 @@ shown.
 ## Tested on
 
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
-posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids), ★ Top rated on and off, Sort by Newest
-and Rating, and the module card. OK opened the title itself on DRTV (whether it was running or not), on Viaplay,
-on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already running. Disney+
+posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids), ★ Top rated on and off, Sort by
+Newest and Rating, and the module card. OK opened the title itself on DRTV (whether it was running or not), on
+Viaplay, on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already
+running, and Prime Video's search for The Joy of Painting, which Movie of the Night has no link for. Disney+
 opened the title from a link of the same form sent by hand.
 
 ## Licence
