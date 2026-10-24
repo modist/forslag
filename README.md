@@ -103,7 +103,9 @@ When a source can't be reached, the last answers are shown.
   narrower genres there are few.
 - **Opening a title directly** works on DRTV and Viaplay from their own catalogues. On Netflix and Disney+ it
   needs Wikidata's id for the title (most well-known titles, few new ones) or a Movie of the Night key, and on
-  HBO Max the key. TV 2 Play and YouSee open at their home screen. Netflix and Disney+ ask for a profile first
+  HBO Max the key. TV 2 Play and YouSee open at their home screen: TV 2 Play's app opens a title only from
+  inside itself (its title screen is not exported to other apps, and its one public link, `tv2play.dk/start`,
+  opens the front page). Netflix and Disney+ ask for a profile first
   when they were not already running.
 - **Quality filter.** Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles
   that are popular elsewhere but unknown here.
