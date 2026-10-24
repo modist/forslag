@@ -629,9 +629,11 @@ public class MainActivity extends Activity {
         } else {
             return null;
         }
-        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(s.pkg);
-        // DRTV takes a link on the screen it is on, but restarts at its front page when that screen is cleared.
-        if (!s.pkg.equals(Suggestions.DRTV)) i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(s.pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        // DRTV restarts at its front page when its running screen is opened afresh, and without CLEAR_TOP it drops
+        // the link on a cold start; SINGLE_TOP hands the link to the running screen instead, and both cases work.
+        if (s.pkg.equals(Suggestions.DRTV)) i.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         // Netflix opens the title only when it is told where the link came from.
         if (s.pkg.equals(Suggestions.NETFLIX)) i.putExtra("source", "30");
         return i;

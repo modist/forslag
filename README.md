@@ -118,7 +118,7 @@ When a source can't be reached, the last answers are shown.
 
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
 posters, D-pad, genre tabs (Comedy movies, Crime series) and the module card. OK opened the title itself on
-DRTV, on Viaplay, on HBO Max (through Movie of the Night) and on Netflix while Netflix was already running. Disney+
+DRTV (whether it was running or not), on Viaplay, on HBO Max (through Movie of the Night) and on Netflix while Netflix was already running. Disney+
 opened the title from a link of the same form sent by hand.
 
 ## Licence
