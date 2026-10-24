@@ -18,6 +18,7 @@
         <item>HBO Max,Max|com.wbd.stream</item>
         <item>Disney Plus|com.disney.disneyplus</item>
         <item>viaplay:Viaplay|com.viaplay.android</item>
+        <item>Amazon Prime Video|com.amazon.amazonvideo.livingroom</item>
         <item>YouSee Play,YouSee|dk.yousee.tv.leanback</item>
     </string-array>
 

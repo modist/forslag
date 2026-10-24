@@ -7,8 +7,8 @@ What is included in your own streaming subscriptions right now, on one Android T
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action,
 Sci-fi & fantasy, Documentary, Entertainment (series), Family & kids and Animation. Focus a title to see its year,
-rating, plot and which of your services has it. Press OK to open it: Netflix, Disney+, HBO Max, DRTV and Viaplay
-open the title itself where there is a link to it, and the other services open at their home screen.
+rating, plot and which of your services has it. Press OK to open it: Netflix, Disney+, HBO Max, Prime Video, DRTV
+and Viaplay open the title itself where there is a link to it, and the other services open at their home screen.
 
 It is an ordinary Android TV app (Android 8 and later), and it also declares a module card for the
 [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher, so it can sit in that launcher's dock
@@ -21,7 +21,7 @@ It is an ordinary Android TV app (Android 8 and later), and it also declares a m
 | [TMDb](https://www.themoviedb.org/) | Most titles, plots, posters and genres; which subscription has what comes from JustWatch through TMDb. This product uses the TMDB API but is not endorsed or certified by TMDB. |
 | DRTV and Viaplay | Their own catalogues, for DR's and Viaplay's titles and links. Both APIs are undocumented and unofficial (see [Limits](#limits)). |
 | [Wikidata](https://www.wikidata.org/) (CC0) | The Netflix and Disney+ ids that open a title directly. |
-| [Movie of the Night](https://www.movieofthenight.com/) (optional) | The HBO Max, Netflix and Disney+ page of a title Wikidata has no id for, asked when you press OK. Needs a free key of your own. |
+| [Movie of the Night](https://www.movieofthenight.com/) (optional) | The HBO Max and Prime Video page of a title, and the Netflix and Disney+ page of one Wikidata has no id for, asked when you press OK. Needs a free key of your own. |
 
 Every source is free and needs no sign-in. TMDb needs a free API key of your own, and Movie of the Night, if you
 want it, another.
@@ -31,8 +31,8 @@ want it, another.
 1. Make a free TMDb account and ask for an API key at <https://www.themoviedb.org/settings/api>. Either the
    v3 "API Key" or the v4 "API Read Access Token" works.
 2. Optional: make a free account at [Movie of the Night](https://developers.movieofthenight.com/) and copy
-   the API key from its dashboard (the free plan is enough). With it, OK opens the title itself on HBO Max, and
-   on Netflix and Disney+ for titles Wikidata has no id for. Without it, those open at the app's home screen.
+   the API key from its dashboard (the free plan is enough). With it, OK opens the title itself on HBO Max and Prime
+   Video, and on Netflix and Disney+ for titles Wikidata has no id for. Without it, those open at the app's home screen.
 3. Put the keys in `local.properties` in the project folder. Git ignores that file, so the keys stay out of the
    repo.
 
@@ -52,6 +52,7 @@ want it, another.
    <item>HBO Max,Max|com.wbd.stream</item>
    <item>drtv:DRTV|dk.dr.tvplayer</item>
    <item>viaplay:Viaplay|com.viaplay.android</item>
+   <item>Amazon Prime Video|com.amazon.amazonvideo.livingroom</item>
    ```
 
    Each line is the service's name on TMDb, then `|` and the Android TV app's package. Several names,
@@ -86,7 +87,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press OK on it, and only when it is on HBO Max, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
+| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press OK on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account. Answers and posters are cached in the app's cache
@@ -105,7 +106,7 @@ When a source can't be reached, the last answers are shown.
   narrower genres there are few.
 - **Opening a title directly** works on DRTV and Viaplay from their own catalogues. On Netflix and Disney+ it
   needs Wikidata's id for the title (most well-known titles, few new ones) or a Movie of the Night key, and on
-  HBO Max the key. TV 2 Play and YouSee open at their home screen: TV 2 Play's app opens a title only from
+  HBO Max and Prime Video the key. TV 2 Play and YouSee open at their home screen: TV 2 Play's app opens a title only from
   inside itself (its title screen is not exported to other apps, and its one public link, `tv2play.dk/start`,
   opens the front page). Netflix and Disney+ ask for a profile first
   when they were not already running.
@@ -118,7 +119,7 @@ When a source can't be reached, the last answers are shown.
 
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
 posters, D-pad, genre tabs (Comedy movies, Crime series) and the module card. OK opened the title itself on
-DRTV (whether it was running or not), on Viaplay, on HBO Max (through Movie of the Night) and on Netflix while Netflix was already running. Disney+
+DRTV (whether it was running or not), on Viaplay, on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already running. Disney+
 opened the title from a link of the same form sent by hand.
 
 ## Licence

@@ -20,7 +20,8 @@ final class Suggestions {
     private Suggestions() {}
 
     static final String NETFLIX = "com.netflix.ninja", DISNEY = "com.disney.disneyplus", DRTV = "dk.dr.tvplayer",
-            VIAPLAY = "com.viaplay.android", HBO = "com.wbd.stream";
+            VIAPLAY = "com.viaplay.android", HBO = "com.wbd.stream",
+            PRIME = "com.amazon.amazonvideo.livingroom";
     /** Where a service's titles come from: TMDb, or the service's own catalogue. */
     static final String FROM_TMDB = "tmdb", FROM_DRTV = "drtv", FROM_VIAPLAY = "viaplay";
 
@@ -430,6 +431,7 @@ final class Suggestions {
             case NETFLIX: return "netflix";
             case DISNEY: return "disney";
             case HBO: return "hbo";
+            case PRIME: return "prime";
             default: return null;
         }
     }
@@ -451,7 +453,7 @@ final class Suggestions {
             if (service == null || !str(o, "type").equals("subscription")) continue;
             String link = str(o, "link");
             if (!link.startsWith("https://")) continue;
-            for (String pkg : new String[] {NETFLIX, DISNEY, HBO}) {
+            for (String pkg : new String[] {NETFLIX, DISNEY, HBO, PRIME}) {
                 if (motnService(pkg).equals(str(service, "id"))) out.putIfAbsent(pkg, link);
             }
         }
