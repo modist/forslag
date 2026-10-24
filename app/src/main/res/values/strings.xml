@@ -11,8 +11,19 @@
     <string name="no_services">None of your services were found on TMDb.</string>
     <string name="unmatched">Not on TMDb: %1$s</string>
     <string name="updated">Updated %1$s</string>
-    <string name="watch_on">Watch on %1$s</string>
+    <string name="watch_on" translatable="false">▶  %1$s</string>
     <string name="back">Back</string>
+    <plurals name="seasons">
+        <item quantity="one">%d season</item>
+        <item quantity="other">%d seasons</item>
+    </plurals>
+    <plurals name="episodes">
+        <item quantity="one">%d episode</item>
+        <item quantity="other">%d episodes</item>
+    </plurals>
+    <string name="runtime_hours">%1$d h %2$d min</string>
+    <string name="runtime_minutes">%1$d min</string>
+    <string name="cast">Starring %1$s</string>
     <string name="not_installed">%1$s is not installed</string>
     <string name="empty_genre">Nothing in this genre on your services right now.</string>
     <string name="top_rated">★ Top rated (%1$s+)</string>
