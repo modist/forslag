@@ -10,6 +10,8 @@
     <string name="no_services">Ingen af dine tjenester blev fundet på TMDb.</string>
     <string name="unmatched">Ikke på TMDb: %1$s</string>
     <string name="updated">Opdateret %1$s</string>
+    <string name="watch_on">Se på %1$s</string>
+    <string name="back">Tilbage</string>
     <string name="not_installed">%1$s er ikke installeret</string>
     <string name="empty_genre">Ingen titler i denne genre på dine tjenester lige nu.</string>
     <string name="top_rated">★ Højt vurderet (%1$s+)</string>

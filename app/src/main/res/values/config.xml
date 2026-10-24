@@ -9,7 +9,7 @@
          provider id. A service TMDb does not know is listed in the status line at the bottom of the screen,
          so you can fix the name. "drtv:" or "viaplay:" in front takes that service's titles from its own catalogue
          instead (DR's lists below; Viaplay's most popular titles included in the subscription, and its genre
-         pages). OK on a title opens it directly on Netflix, Disney+, DRTV and Viaplay when there is a link to it,
+         pages). Watch on a title's detail page (OK on it) opens it directly on Netflix, Disney+, DRTV and Viaplay when there is a link to it,
          and on HBO Max and Prime Video with a Movie of the Night key (motn.key); without a link, Prime Video and
          HBO Max open their search for the title, and other services the first of their apps that is installed. -->
     <string-array name="services" translatable="false">
