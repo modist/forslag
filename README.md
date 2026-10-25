@@ -4,6 +4,11 @@ What is included in your own streaming subscriptions right now, on one Android T
 
 ![Forslag on a Philips Android TV: The Dark Knight focused in the movie row, genre tabs, Sort and Top rated](screenshot.jpg)
 
+[![A one-minute video on YouTube: from the Clean Your TV launcher into Forslag, a genre, Sort and Top rated, and a title opened in HBO Max](https://img.youtube.com/vi/KY-__0FU64A/maxresdefault.jpg)](https://youtu.be/KY-__0FU64A)
+
+*Watch it on a TV: a one-minute run on the Philips set, recorded live, from the launcher to a title opening in HBO Max
+([YouTube](https://youtu.be/KY-__0FU64A)).*
+
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action, Sci-fi &
 fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that genre. A
