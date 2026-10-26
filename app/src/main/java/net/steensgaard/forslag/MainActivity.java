@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -1077,7 +1078,15 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout row(LinearLayout col) {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        HorizontalScrollView scroll = new HorizontalScrollView(this) {
+            /** One tile early: the tile next to the focused one stays in view too, so the row moves on the one before last. */
+            @Override
+            protected int computeScrollDeltaToGetChildRectOnScreen(Rect rect) {
+                Rect wider = new Rect(rect);
+                wider.inset(-dp(92 + 12), 0);
+                return super.computeScrollDeltaToGetChildRectOnScreen(wider);
+            }
+        };
         scroll.setHorizontalScrollBarEnabled(false);
         scroll.setClipToPadding(false);
         scroll.setClipChildren(false);
