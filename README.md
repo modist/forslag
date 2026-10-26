@@ -14,7 +14,8 @@ mixed from each of your services in turn. Each row has genre tabs: All, Drama, C
 fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that genre. A
 **★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in both
 rows, and is remembered. Next to it, **Sort** cycles Popular, Newest (release date) and Rating with OK; it
-re-orders the titles the rows already hold, so it is instant and asks no server. Focus a title to see its
+re-orders the titles the rows already hold, so it is instant and asks no server. **Refresh** asks every
+source again now, past the cache (pictures aside), and fills both rows anew. Focus a title to see its
 year, rating, plot and which of your services has it. Press OK for its detail page: the backdrop and poster,
 the year and rating, a movie's running time or a series' seasons and episodes, the first six actors, and the
 plot, with room down to the bottom of the screen.
@@ -113,7 +114,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
 picture is cached for 76 hours (`cache_hours` in `config.xml`), Wikidata's ids are kept per title, a genre is
 fetched only when you press OK on its tab, and Movie of the Night is asked only when you press a service's button on a title.
-Opening the app again within that time sends nothing. When a source can't be reached, the last answers are
+Opening the app again within that time sends nothing, unless you press Refresh. When a source can't be reached, the last answers are
 shown.
 
 ## Limits

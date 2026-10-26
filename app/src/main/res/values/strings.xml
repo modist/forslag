@@ -28,6 +28,7 @@
     <string name="empty_genre">Nothing in this genre on your services right now.</string>
     <string name="top_rated">★ Top rated (%1$s+)</string>
     <string name="sort">Sort: %1$s</string>
+    <string name="refresh">Refresh</string>
     <string name="order_popular">Popular</string>
     <string name="order_newest">Newest</string>
     <string name="order_rating">Rating</string>

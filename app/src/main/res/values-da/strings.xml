@@ -26,6 +26,7 @@
     <string name="empty_genre">Ingen titler i denne genre på dine tjenester lige nu.</string>
     <string name="top_rated">★ Højt vurderet (%1$s+)</string>
     <string name="sort">Sortér: %1$s</string>
+    <string name="refresh">Opdatér</string>
     <string name="order_popular">Populære</string>
     <string name="order_newest">Nyeste</string>
     <string name="order_rating">Bedømmelse</string>

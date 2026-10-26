@@ -81,10 +81,12 @@ public class MainActivity extends Activity {
     private volatile boolean topRated;
     private double topMin;
     private SharedPreferences prefs;
-    private TextView topToggle, sortButton;
+    private TextView topToggle, sortButton, refreshButton;
     /** How the rows are ordered: one of Suggestions.ORDERS. Kept between launches. */
     private String order;
     private boolean loading;
+    /** The load running was started by Refresh, which keeps the focus when it is done. */
+    private boolean refreshing;
     /** When the rows were last filled; they are kept as they are (and the focus with them) until the cache is stale. */
     private long loadedAt;
     /** The services TMDb, DRTV or Viaplay can give titles for; set by the first load, read by the genre tabs. */
@@ -248,6 +250,19 @@ public class MainActivity extends Activity {
         for (Section s : new Section[] {movies, series}) s.choose(s.genre);
     }
 
+    /**
+     * Asks every source again now, cache or not: TMDb, DRTV, Viaplay and Wikidata (pictures aside), and fills both
+     * rows anew on All. A source that can't be reached keeps its last answer.
+     */
+    private void refresh() {
+        if (loading) return;
+        tmdb.refresh();
+        streams.clear();
+        refreshing = true;
+        status.setText(R.string.loading);
+        load();
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -309,10 +324,18 @@ public class MainActivity extends Activity {
         sortButton.setFocusable(false);
         sortButton.setOnClickListener(v -> nextOrder());
         showOrder();
+        refreshButton = text(13, Typeface.NORMAL, 0xFFFFFFFF);
+        refreshButton.setText(R.string.refresh);
+        refreshButton.setPadding(dp(12), dp(4), dp(12), dp(4));
+        refreshButton.setBackground(tabBackground());
+        // Usable from the start, so a first load that failed can be tried again.
+        refreshButton.setFocusable(true);
+        refreshButton.setOnClickListener(v -> refresh());
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
         gap.setMargins(0, 0, dp(8), 0);
+        controls.addView(refreshButton, gap);
         controls.addView(sortButton, gap);
         controls.addView(topToggle);
         top.addView(controls, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
@@ -742,7 +765,7 @@ public class MainActivity extends Activity {
                 }
                 if (!wanted) continue;
                 JSONObject e = known.optJSONObject(idKey(t));
-                if (e != null && now - e.optLong("at") < tmdb.freshMs()) {
+                if (e != null && now - e.optLong("at") < tmdb.freshMs() && e.optLong("at") >= tmdb.refreshedAt()) {
                     t.netflixId = e.optString("n", "");
                     t.disneyId = e.optString("d", "");
                 } else {
@@ -833,9 +856,11 @@ public class MainActivity extends Activity {
                 topToggle.setFocusable(true);
                 sortButton.setFocusable(true);
             }
+            // After Refresh the focus stays on the button.
             View first = firstTile();
-            if (first != null) first.requestFocus();
+            if (first != null && !refreshing) first.requestFocus();
         }
+        refreshing = false;
         StringBuilder line = new StringBuilder(r.error != 0 ? getString(r.error)
                 : getString(R.string.updated, new SimpleDateFormat("HH:mm", Locale.ROOT).format(new Date())));
         if (!r.unmatched.isEmpty()) line.append("  ·  ").append(getString(R.string.unmatched, TextUtils.join(", ", r.unmatched)));

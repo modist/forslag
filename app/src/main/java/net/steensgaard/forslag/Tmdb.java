@@ -33,6 +33,8 @@ final class Tmdb {
     private final File dir;
     /** How long an answer or an image stays fresh: cache_hours in config.xml. */
     private final long freshMs;
+    /** Answers saved before this are asked again (pictures aside); set by Refresh. Whole seconds, like lastModified on some disks. */
+    private volatile long refreshedAt;
 
     Tmdb(String key, File cacheDir, int hours) {
         this.key = key;
@@ -42,30 +44,41 @@ final class Tmdb {
     }
 
     JSONObject json(String path) throws Exception {
-        return new JSONObject(new String(cached(API + path, true, null, null, freshMs), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(API + path, true, null, null, refreshedAt), StandardCharsets.UTF_8));
     }
 
     /** JSON from any other server, without the key. */
     JSONObject open(String url) throws Exception {
-        return new JSONObject(new String(cached(url, false, null, null, freshMs), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(url, false, null, null, refreshedAt), StandardCharsets.UTF_8));
     }
 
     /** JSON from a server that takes its own key in a header; the key is not part of the cache's file name. */
     JSONObject open(String url, String header, String value) throws Exception {
-        return new JSONObject(new String(cached(url, false, header, value, freshMs), StandardCharsets.UTF_8));
+        return new JSONObject(new String(cached(url, false, header, value, refreshedAt), StandardCharsets.UTF_8));
     }
 
+    /** A picture at a URL does not change, so Refresh leaves the saved ones alone. */
     byte[] image(String url) throws Exception {
-        return cached(url, false, null, null, freshMs);
+        return cached(url, false, null, null, 0);
     }
 
     long freshMs() {
         return freshMs;
     }
 
-    private byte[] cached(String url, boolean api, String header, String value, long maxAgeMs) throws Exception {
+    /** Every answer saved until now counts as stale; one that can't be fetched again is still used. */
+    void refresh() {
+        refreshedAt = System.currentTimeMillis() / 1000 * 1000;
+    }
+
+    long refreshedAt() {
+        return refreshedAt;
+    }
+
+    private byte[] cached(String url, boolean api, String header, String value, long since) throws Exception {
         File f = new File(dir, sha1(url));
-        if (f.exists() && System.currentTimeMillis() - f.lastModified() < maxAgeMs) return read(new FileInputStream(f));
+        long saved = f.exists() ? f.lastModified() : 0;
+        if (saved >= since && System.currentTimeMillis() - saved < freshMs) return read(new FileInputStream(f));
         try {
             byte[] body = fetch(url, api, header, value);
             File tmp = new File(dir, f.getName() + ".tmp");
