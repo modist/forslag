@@ -65,6 +65,8 @@ final class Suggestions {
         /** The release date as TMDb gives it (2019-07-24), or only the year where DR or Viaplay is the source. */
         String date = "";
         double rating;
+        /** The age label from the service's own catalogue (Viaplay's "A", "7", "11", "15"); "" where it gives none. */
+        String age = "";
         /** What the apps open a title by: Netflix and Disney+ ids from Wikidata, DRTV's and Viaplay's own paths. */
         String netflixId = "", disneyId = "", drPath = "", viaplayPath = "";
         /** Links to the title by app package, from Movie of the Night, once asked (see motnPath). */
@@ -81,6 +83,7 @@ final class Suggestions {
         void absorb(Title o) {
             if (id == 0) id = o.id;
             if (rating == 0) rating = o.rating;
+            if (age.isEmpty()) age = o.age;
             if (year.isEmpty()) year = o.year;
             if (date.length() < o.date.length()) date = o.date;
             if (overview.isEmpty()) overview = o.overview;
@@ -218,14 +221,34 @@ final class Suggestions {
         }
     }
 
-    /** What is included in one subscription in one country, most popular first. */
+    /**
+     * What is included in one subscription in one country, most popular first. With an age group (the region's
+     * labels in it joined with |, such as "A|7"), only titles with one of those labels in the region; TMDb leaves
+     * out those without a label.
+     */
     static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes, Genre genre,
-            double minRating) {
+            double minRating, String ageGroup) {
         String genres = genre == null ? "" : "&with_genres=" + (tv ? genre.tvIds : genre.movieIds).replace("|", "%7C");
         String rated = minRating > 0 ? "&vote_average.gte=" + minRating : "";
+        String aged = ageGroup == null || ageGroup.isEmpty() ? ""
+                : "&certification_country=" + region + "&certification=" + encode(ageGroup);
         return "/discover/" + (tv ? "tv" : "movie") + "?watch_region=" + region + "&with_watch_providers="
                 + providerId + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&include_adult=false"
-                + "&vote_count.gte=" + minVotes + rated + genres + "&language=" + language + "&page=1";
+                + "&vote_count.gte=" + minVotes + rated + aged + genres + "&language=" + language + "&page=1";
+    }
+
+    /**
+     * The titles with one of the labels in an age group ("A|7"); a title without a label is left out. All of them
+     * when the group is empty.
+     */
+    static List<Title> forAge(List<Title> titles, String ageGroup) {
+        if (ageGroup == null || ageGroup.isEmpty()) return titles;
+        List<String> labels = java.util.Arrays.asList(ageGroup.split("\\|"));
+        List<Title> out = new ArrayList<>();
+        for (Title t : titles) {
+            if (labels.contains(t.age)) out.add(t);
+        }
+        return out;
     }
 
     /** The ways a row can be ordered: as mixed (most popular first, the services taking turns), newest, best rated. */
@@ -454,6 +477,8 @@ final class Suggestions {
             t.year = year > 0 ? String.valueOf(year) : "";
             t.date = t.year;
             t.overview = !str(c, "synopsis").isEmpty() || series == null ? str(c, "synopsis") : str(series, "synopsis");
+            // Viaplay's Danish age label; parentalRating is a British one.
+            t.age = str(c, "localParentalRating");
             JSONObject imdb = c.optJSONObject("imdb");
             try {
                 t.rating = imdb != null ? Double.parseDouble(str(imdb, "rating").replace(',', '.')) : 0;
@@ -492,12 +517,7 @@ final class Suggestions {
 
     /** A search for the title in the app, for the apps that take a search link; null for the others. */
     static String searchUrl(String pkg, String name) {
-        String q;
-        try {
-            q = java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20");
-        } catch (java.io.UnsupportedEncodingException e) {
-            return null;
-        }
+        String q = encode(name);
         switch (pkg) {
             case PRIME: return "https://app.primevideo.com/search?phrase=" + q;
             case HBO: return "https://play.hbomax.com/search/result?q=" + q;
@@ -614,6 +634,15 @@ final class Suggestions {
             }
         }
         return out;
+    }
+
+    /** For a URL's query: spaces as %20. */
+    static String encode(String s) {
+        try {
+            return java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** JSON null comes back from optString as "null"; treat it as empty. */

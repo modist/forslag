@@ -23,10 +23,17 @@
     <string name="runtime_minutes">%1$d min</string>
     <string name="cast">Medvirkende: %1$s</string>
     <string name="not_installed">%1$s er ikke installeret</string>
-    <string name="empty_genre">Ingen titler i denne genre på dine tjenester lige nu.</string>
+    <string name="empty_genre">Ingen titler som disse på dine tjenester lige nu.</string>
     <string name="top_rated">★ Højt vurderet (%1$s+)</string>
     <string name="sort">Sortér: %1$s</string>
     <string name="refresh">Opdatér</string>
+    <string name="age">Alder: %1$s</string>
+    <string name="age_all">Alle</string>
+    <string-array name="age_group_names">
+        <item>Børn</item>
+        <item>Store børn</item>
+        <item>Unge og voksne</item>
+    </string-array>
     <string name="order_popular">Populære</string>
     <string name="order_newest">Nyeste</string>
     <string name="order_rating">Bedømmelse</string>

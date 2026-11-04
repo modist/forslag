@@ -25,10 +25,18 @@
     <string name="runtime_minutes">%1$d min</string>
     <string name="cast">Starring %1$s</string>
     <string name="not_installed">%1$s is not installed</string>
-    <string name="empty_genre">Nothing in this genre on your services right now.</string>
+    <string name="empty_genre">Nothing like this on your services right now.</string>
     <string name="top_rated">★ Top rated (%1$s+)</string>
     <string name="sort">Sort: %1$s</string>
     <string name="refresh">Refresh</string>
+    <string name="age">Age: %1$s</string>
+    <string name="age_all">All</string>
+    <!-- The names of the age groups in config.xml, in the same order. -->
+    <string-array name="age_group_names">
+        <item>Kids</item>
+        <item>Big kids</item>
+        <item>Teens &amp; adults</item>
+    </string-array>
     <string name="order_popular">Popular</string>
     <string name="order_newest">Newest</string>
     <string name="order_rating">Rating</string>

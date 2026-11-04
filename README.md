@@ -13,9 +13,11 @@ What is included in your own streaming subscriptions right now, on one Android T
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action, Sci-fi &
 fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that genre. A
 **★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in both
-rows, and is remembered. Next to it, **Sort** cycles Popular, Newest (release date) and Rating with OK; it
-re-orders the titles the rows already hold, so it is instant and asks no server. **Refresh** asks every
-source again now, past the cache (pictures aside), and fills both rows anew. Focus a title to see its
+rows, and is remembered. Next to it, **Age** steps with OK through All, Kids (Denmark's age labels A and 7),
+Big kids (11) and Teens & adults (15), set in `age_groups`, and keeps only titles with those labels, in both rows;
+it is remembered too, and the rows follow once the button rests. **Sort** cycles Popular, Newest (release date) and Rating with OK; it
+re-orders the titles the rows already hold, so it is instant and asks no server. **Refresh**, at the bottom
+next to the time of the last update (Down from the series row), asks every source again now, past the cache (pictures aside), and fills both rows anew. Focus a title to see its
 year, rating, plot and which of your services has it. Press OK for its detail page: the backdrop and poster,
 the year and rating, a movie's running time or a series' seasons and episodes, the first six actors, and the
 plot, with room down to the bottom of the screen.
@@ -108,7 +110,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons and the cast. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
+| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons and the cast. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
@@ -138,6 +140,12 @@ shown.
 - **Quality filter.** Titles with fewer than 50 TMDb votes are left out (`min_votes`), which keeps out titles
   that are popular elsewhere but unknown here. With ★ Top rated on, TMDb's rating counts (IMDb's for Viaplay
   titles); DR gives none, so DRTV-only titles drop out then.
+- **Age.** The labels are TMDb's Danish ones for TMDb's titles and Viaplay's own for Viaplay's. A title without a
+  Danish label is left out when an age is chosen: TMDb has them for most well-known movies but few series (of
+  Netflix's 1,429 series with 50 votes or more, 57 are labelled up to 11), and DR gives none, so DRTV's titles
+  drop out. Expect thin series rows, especially for Big kids (Netflix has 9 series labelled 11). Denmark has no
+  18 label, and TMDb can't ask for titles without one, so adults share the 15 group. Outside Denmark, put your
+  country's labels in `age_groups`, youngest first (TMDb's `/certification/movie/list`).
 - **Freshness.** Lists can be up to 76 hours old.
 - **Availability.** TMDb's availability data is JustWatch's and can lag a day or two behind a service's catalogue.
   Plots are in the configured language where TMDb has one, and empty otherwise.

@@ -55,8 +55,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * What is included in your streaming subscriptions right now, from TMDb's discover API (catalogue data by
  * JustWatch) and DRTV's and Viaplay's own catalogues: a row of movies and a row of series, each with genre tabs, with
- * the services in res/values/config.xml, a Top rated switch and a Sort button. Only the region, the language, the
- * genre, the rating and the provider or title ids go to TMDb, with the key; Wikidata gets the TMDb ids of the titles
+ * the services in res/values/config.xml, a Top rated switch, an Age button and a Sort button. Only the region, the language, the
+ * genre, the rating, the age label and the provider or title ids go to TMDb, with the key; Wikidata gets the TMDb ids of the titles
  * on Netflix and Disney+, and Movie of the Night one title's id when Watch is pressed on it. OK on a title shows its
  * detail page, with a Watch button per service that opens the title in that app where there is a link to it, and a
  * Back button that (like the remote's) returns to the rows. Every answer is cached for cache_hours.
@@ -64,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends Activity {
     static final String TAG = "Forslag";
     private static final long BACKDROP_DELAY_MS = 300;
+    private static final long AGE_DELAY_MS = 700;
     /** The width of the poster on the detail page, and of the buttons below it, in dp. */
     private static final int POSTER_W = 180;
     /** How many actors the detail page names. */
@@ -82,7 +83,17 @@ public class MainActivity extends Activity {
     private volatile boolean topRated;
     private double topMin;
     private SharedPreferences prefs;
-    private TextView topToggle, sortButton, refreshButton;
+    private TextView topToggle, sortButton, refreshButton, ageButton;
+    /** The age groups the Age button steps through, youngest first: each the region's labels joined with | (config.xml). */
+    private List<String> ages;
+    /** Their names on the button, in the same order. */
+    private String[] ageNames;
+    /** The age group shown, or "" for every title. Kept between launches. */
+    private volatile String age;
+    /** Fetches the rows for the age chosen once the Age button has rested, so stepping past a few asks no server. */
+    private final Runnable applyAge = () -> {
+        for (Section s : new Section[] {movies, series}) s.choose(s.genre);
+    };
     /** How the rows are ordered: one of Suggestions.ORDERS. Kept between launches. */
     private String order;
     private boolean loading;
@@ -184,7 +195,8 @@ public class MainActivity extends Activity {
 
         void choose(Suggestions.Genre g) {
             final boolean top = topRated;
-            final String key = key(g, top);
+            final String maxAge = age;
+            final String key = key(g, top, maxAge);
             if (key.equals(showing)) return;
             genre = g;
             mark();
@@ -200,7 +212,7 @@ public class MainActivity extends Activity {
             new Thread(() -> {
                 List<Suggestions.Title> titles;
                 try {
-                    titles = buildRow(tv, g, top);
+                    titles = buildRow(tv, g, top, maxAge);
                 } catch (Exception e) {
                     Log.w(TAG, "genre " + key + ": " + e);
                     titles = null;
@@ -220,9 +232,27 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** What a section keeps a fetched row under: its genre, and whether only top rated titles were asked for. */
-    private static String key(Suggestions.Genre g, boolean top) {
-        return (g == null ? "all" : g.key) + (top ? ":top" : "");
+    /** What a section keeps a fetched row under: its genre, whether only top rated titles were asked for, and the age. */
+    private static String key(Suggestions.Genre g, boolean top, String maxAge) {
+        return (g == null ? "all" : g.key) + (top ? ":top" : "") + (maxAge.isEmpty() ? "" : ":age" + maxAge);
+    }
+
+    /** The next age group on OK: all, then each group from the youngest, then all again. The rows follow when it rests. */
+    private void nextAge() {
+        int i = ages.indexOf(age);
+        age = i + 1 < ages.size() ? ages.get(i + 1) : "";
+        prefs.edit().putString("age", age).apply();
+        showAge();
+        main.removeCallbacks(applyAge);
+        main.postDelayed(applyAge, AGE_DELAY_MS);
+    }
+
+    /** "Age: All", then the group's name: "Age: Kids" and so on. */
+    private void showAge() {
+        int i = ages.indexOf(age);
+        String value = i < 0 ? getString(R.string.age_all) : i < ageNames.length ? ageNames[i] : age;
+        ageButton.setText(getString(R.string.age, value));
+        ageButton.setSelected(!age.isEmpty());
     }
 
     /** The next order on OK: popular, newest, rating, popular. Only re-sorts what the rows hold; no API calls. */
@@ -278,6 +308,11 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("forslag", MODE_PRIVATE);
         topRated = prefs.getBoolean("top_rated", false);
         order = prefs.getString("order", Suggestions.POPULAR);
+        ages = Arrays.asList(getResources().getStringArray(R.array.age_groups));
+        ageNames = getResources().getStringArray(R.array.age_group_names);
+        age = prefs.getString("age", "");
+        // A group no longer in config.xml counts as all.
+        if (!ages.contains(age)) age = "";
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
@@ -309,7 +344,10 @@ public class MainActivity extends Activity {
         header.setOrientation(LinearLayout.VERTICAL);
         top.addView(header, new FrameLayout.LayoutParams(-1, -1));
         title = oneLine(text(30, Typeface.BOLD, 0xFFFFFFFF));
-        header.addView(title, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.6f), -2));
+        // Up to 60% of the screen, and never under the buttons in the corner (see the controls' layout listener).
+        final int titleMax = Math.round(getResources().getDisplayMetrics().widthPixels * 0.6f);
+        title.setMaxWidth(titleMax);
+        header.addView(title, new LinearLayout.LayoutParams(-2, -2));
         topToggle = text(13, Typeface.NORMAL, 0xFFFFFFFF);
         topToggle.setText(getString(R.string.top_rated, getString(R.string.top_rated_min)));
         topToggle.setPadding(dp(12), dp(4), dp(12), dp(4));
@@ -325,6 +363,15 @@ public class MainActivity extends Activity {
         sortButton.setFocusable(false);
         sortButton.setOnClickListener(v -> nextOrder());
         showOrder();
+        ageButton = text(13, Typeface.NORMAL, 0xFFFFFFFF);
+        ageButton.setPadding(dp(12), dp(4), dp(12), dp(4));
+        ageButton.setBackground(tabBackground());
+        ageButton.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_selected}, {}},
+                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        ageButton.setFocusable(false);
+        ageButton.setOnClickListener(v -> nextAge());
+        ageButton.setVisibility(ages.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!ages.isEmpty()) showAge();
         refreshButton = text(13, Typeface.NORMAL, 0xFFFFFFFF);
         refreshButton.setText(R.string.refresh);
         refreshButton.setPadding(dp(12), dp(4), dp(12), dp(4));
@@ -336,10 +383,15 @@ public class MainActivity extends Activity {
         controls.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
         gap.setMargins(0, 0, dp(8), 0);
-        controls.addView(refreshButton, gap);
         controls.addView(sortButton, gap);
+        controls.addView(ageButton, gap);
         controls.addView(topToggle);
         top.addView(controls, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
+        // The title ends a little before the buttons, however wide their labels make them ("Alder: op til 15").
+        controls.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            int max = Math.max(0, Math.min(titleMax, l - dp(24)));
+            if (title.getMaxWidth() != max) title.post(() -> title.setMaxWidth(max));
+        });
         meta = oneLine(text(15, Typeface.NORMAL, accent));
         meta.setPadding(0, dp(6), 0, dp(8));
         header.addView(meta);
@@ -354,8 +406,14 @@ public class MainActivity extends Activity {
 
         View spacer = new View(this);
         col.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
+        // Refresh sits by the time of the last update, at the bottom: Down from the series row.
+        LinearLayout foot = new LinearLayout(this);
+        foot.setOrientation(LinearLayout.HORIZONTAL);
+        foot.setGravity(Gravity.CENTER_VERTICAL);
+        foot.addView(refreshButton, gap);
         status = oneLine(text(12, Typeface.NORMAL, 0x80FFFFFF));
-        col.addView(status);
+        foot.addView(status, new LinearLayout.LayoutParams(0, -2, 1f));
+        col.addView(foot);
         TextView credit = oneLine(text(11, Typeface.NORMAL, 0x66FFFFFF));
         credit.setText(R.string.attribution);
         credit.setPadding(0, dp(2), 0, 0);
@@ -626,6 +684,7 @@ public class MainActivity extends Activity {
     /** Everything that comes back from one load, built off the main thread. */
     private static final class Result {
         boolean top;
+        String age;
         List<Suggestions.Title> movies = new ArrayList<>(), series = new ArrayList<>();
         List<String> unmatched = new ArrayList<>();
         int error;
@@ -644,9 +703,11 @@ public class MainActivity extends Activity {
             if (s != null) services.add(s);
         }
         final boolean top = topRated;
+        final String maxAge = age;
         new Thread(() -> {
             Result r = new Result();
             r.top = top;
+            r.age = maxAge;
             try {
                 // A service can be on TMDb's movie list, its TV list or both.
                 for (boolean tv : new boolean[] {false, true}) {
@@ -659,8 +720,8 @@ public class MainActivity extends Activity {
                     else r.unmatched.add(s.names[0]);
                 }
                 found = usable;
-                r.movies = buildRow(false, null, top);
-                r.series = buildRow(true, null, top);
+                r.movies = buildRow(false, null, top, maxAge);
+                r.series = buildRow(true, null, top, maxAge);
                 if (usable.isEmpty()) r.error = R.string.no_services;
                 else if (r.movies.isEmpty() && r.series.isEmpty()) r.error = R.string.nothing;
             } catch (Tmdb.KeyRefused e) {
@@ -675,9 +736,11 @@ public class MainActivity extends Activity {
 
     /**
      * One row: each service's titles (of one genre, or all), mixed in turns, with the TMDb titles checked against
-     * what each service really streams, and links looked up. Runs off the main thread.
+     * what each service really streams, and links looked up. With an age group, only titles with one of its labels.
+     * Runs off the main thread.
      */
-    private List<Suggestions.Title> buildRow(boolean tv, Suggestions.Genre genre, boolean top) throws Exception {
+    private List<Suggestions.Title> buildRow(boolean tv, Suggestions.Genre genre, boolean top, String maxAge)
+            throws Exception {
         double minRating = top ? topMin : 0;
         List<Suggestions.Service> services = found;
         List<List<Suggestions.Title>> lists = new ArrayList<>();
@@ -693,7 +756,8 @@ public class MainActivity extends Activity {
                     l = viaplay(tv, genre);
                 } else {
                     l = Suggestions.parseDiscover(tmdb.json(
-                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre, minRating)), tv);
+                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre, minRating,
+                                    maxAge)), tv);
                 }
             } catch (Tmdb.KeyRefused e) {
                 throw e;
@@ -702,6 +766,8 @@ public class MainActivity extends Activity {
             }
             // TMDb was asked for these ratings already; DR's and Viaplay's own lists are filtered here.
             if (minRating > 0 && s.own()) l = Suggestions.rated(l, minRating);
+            // The same for the age: DR gives no age labels, so DRTV's titles drop out when an age is chosen.
+            if (s.own()) l = Suggestions.forAge(l, maxAge);
             lists.add(l);
         }
         // Each service's share of the row, plus a few for titles that turn out to be rentals, checked in parallel;
@@ -850,12 +916,13 @@ public class MainActivity extends Activity {
             loadedAt = System.currentTimeMillis();
             for (Section s : new Section[] {movies, series}) {
                 s.reset();
-                s.fetched.put(key(null, r.top), s.tv ? r.series : r.movies);
+                s.fetched.put(key(null, r.top, r.age), s.tv ? r.series : r.movies);
                 fill(s, s.tv ? r.series : r.movies);
-                s.showing = key(null, r.top);
+                s.showing = key(null, r.top, r.age);
                 s.enableTabs();
                 topToggle.setFocusable(true);
                 sortButton.setFocusable(true);
+                ageButton.setFocusable(true);
             }
             // After Refresh the focus stays on the button.
             View first = firstTile();

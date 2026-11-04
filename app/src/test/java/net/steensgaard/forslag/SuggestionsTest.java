@@ -89,7 +89,7 @@ public class SuggestionsTest {
 
     @Test
     public void discoverAsksForSubscriptionTitlesInTheRegion() {
-        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null, 0);
+        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null, 0, null);
         assertTrue(p.startsWith("/discover/tv?"));
         assertTrue(p.contains("watch_region=DK"));
         assertTrue(p.contains("with_watch_providers=8"));
@@ -232,8 +232,8 @@ public class SuggestionsTest {
         Suggestions.Genre fun = genre("entertainment");
         assertTrue(!fun.offered(false));
         assertTrue(fun.offered(true));
-        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, crime, 0).contains("&with_genres=80%7C53"));
-        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, crime, 0).contains("&with_genres=80%7C9648"));
+        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, crime, 0, null).contains("&with_genres=80%7C53"));
+        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, crime, 0, null).contains("&with_genres=80%7C9648"));
 
         JSONObject tmdb = new JSONObject("{\"results\":[{\"id\":1,\"title\":\"Heat\",\"genre_ids\":[28,53]}]}");
         Suggestions.Title heat = Suggestions.parseDiscover(tmdb, false).get(0);
@@ -265,6 +265,7 @@ public class SuggestionsTest {
                 + "\"system\":{\"availability\":{\"svod\":{\"start\":\"2026-01-01T00:00:00.000Z\",\"end\":\"2027-01-01T00:00:00.000Z\"}}},"
                 + "\"content\":{\"series\":{\"title\":\"Robinson Ekspeditionen\",\"synopsis\":\"22 deltagere\"},"
                 + "\"production\":{\"year\":2026},\"imdb\":{\"rating\":\"6,1\"},"
+                + "\"localParentalRating\":\"11\",\"parentalRating\":\"12\","
                 + "\"images\":{\"boxart\":{\"url\":\"https://i/x.jpg?width=199&height=298\"}}},"
                 + "\"_links\":{\"viaplay:genres\":[{\"title\":\"Reality\"},{\"title\":\"Underholdning\"}]}},"
                 + "{\"type\":\"series\",\"publicPath\":\"rental\",\"system\":{\"availability\":{}},"
@@ -278,6 +279,7 @@ public class SuggestionsTest {
         assertEquals("Robinson Ekspeditionen", r.name);
         assertEquals("2026", r.year);
         assertEquals(6.1, r.rating, 0.001);
+        assertEquals("11", r.age);
         assertEquals("/serier/robinson-ekspeditionen", r.viaplayPath);
         assertTrue(r.poster.endsWith("width=184&height=276"));
         assertTrue(genre("entertainment").matches(r));
@@ -313,12 +315,30 @@ public class SuggestionsTest {
 
     @Test
     public void topRatedAsksTmdbAndFiltersTheRest() {
-        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, null, 7.0).contains("&vote_average.gte=7.0"));
-        assertTrue(!Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, null, 0).contains("vote_average"));
+        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, null, 7.0, null).contains("&vote_average.gte=7.0"));
+        assertTrue(!Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, null, 0, null).contains("vote_average"));
         Suggestions.Title good = title(1), poor = title(2), unrated = title(3);
         good.rating = 7.4;
         poor.rating = 6.9;
         assertEquals(Arrays.asList(good), Suggestions.rated(Arrays.asList(good, poor, unrated), 7.0));
+    }
+
+    @Test
+    public void ageGroupAsksTmdbForItsLabelsAndFiltersTheRest() {
+        String p = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null, 0, "A|7");
+        assertTrue(p.contains("&certification_country=DK&certification=A%7C7&"));
+        assertTrue(!Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, null, 0, "").contains("certification"));
+        assertTrue(Suggestions.discoverPath(false, 8, "GB", "en-GB", 50, null, 0, "12A").contains("certification=12A&"));
+        Suggestions.Title all = title(1), seven = title(2), fifteen = title(3), none = title(4), british = title(5);
+        all.age = "A";
+        seven.age = "7";
+        fifteen.age = "15";
+        british.age = "12";
+        List<Suggestions.Title> row = Arrays.asList(all, seven, fifteen, none, british);
+        assertEquals(Arrays.asList(all, seven), Suggestions.forAge(row, "A|7"));
+        assertEquals(Arrays.asList(fifteen), Suggestions.forAge(row, "15"));
+        assertEquals(Arrays.asList(), Suggestions.forAge(row, "11"));
+        assertEquals(row, Suggestions.forAge(row, ""));
     }
 
     @Test

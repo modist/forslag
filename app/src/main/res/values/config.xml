@@ -35,6 +35,15 @@
     <integer name="min_votes">50</integer>
     <!-- The lowest rating "Top rated" keeps (TMDb's, or IMDb's for Viaplay titles; DR gives none). -->
     <string name="top_rated_min" translatable="false">7.0</string>
+    <!-- The age groups the Age button steps through, youngest first, named by age_group_names in strings.xml.
+         Each is the region's certifications on TMDb (/certification/movie/list) joined with |; Denmark's are
+         A (for all), 7, 11 and 15. A chosen group keeps the titles with one of its labels; titles without a label
+         are left out (TMDb has few for series, and DR gives none). No items: no Age button. -->
+    <string-array name="age_groups" translatable="false">
+        <item>A|7</item>
+        <item>11</item>
+        <item>15</item>
+    </string-array>
     <!-- How long every answer (lists, availability, links) and every picture is kept before it is fetched again,
          in hours. Long on purpose: few calls to the APIs, at the price of lists up to three days old. -->
     <integer name="cache_hours">76</integer>
