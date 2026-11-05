@@ -13,6 +13,8 @@
     <string name="updated">Updated %1$s</string>
     <string name="watch_on" translatable="false">▶  %1$s</string>
     <string name="back">Back</string>
+    <string name="trailer_play" translatable="false">▶  Trailer</string>
+    <string name="trailer_error">YouTube won’t play this trailer here. Press Back.</string>
     <plurals name="seasons">
         <item quantity="one">%d season</item>
         <item quantity="other">%d seasons</item>

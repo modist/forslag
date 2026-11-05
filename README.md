@@ -33,6 +33,14 @@ is a link to it; without one, Prime Video and HBO Max open their search for the 
 their home screen. **Back**, at the bottom, or Back on the remote, returns to the rows. A series shows its
 seasons and episodes ([screenshot](screenshots/detail-series.jpg)).
 
+When TMDb has a trailer for the title on YouTube, **▶ Trailer** sits on the poster (Up from the first button). It
+plays full screen inside Forslag, in YouTube's own embedded player, never in another app: OK pauses and plays,
+Left and Right go 10 seconds back or on, and Back returns to the detail page; it also closes by itself when the
+trailer ends. The trailer is the title's official one in your language where TMDb has it, else in English. If
+YouTube won't play a trailer in an embedded player, Forslag says so, and Back returns.
+
+![A trailer for How I Met Your Mother playing full screen inside Forslag](screenshots/trailer.jpg)
+
 It is an ordinary Android TV app (Android 8 and later), and it also declares a module card for the
 [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher, so it can sit in that launcher's dock
 (label **Forslag**, caption *Film og serier*).
@@ -112,7 +120,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons and the cast. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
+| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons, the cast and the trailers. YouTube's embedded player from `www.youtube.com` when you press Trailer, with the trailer's id; it plays as on any web page with a YouTube video, ads included where YouTube shows them. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
@@ -161,7 +169,7 @@ shown.
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
 posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids, Drama and Comedy movies together), ★ Top rated on and off, Sort by
 Newest and Rating, the module card, and the detail page (one, two and three services, a movie's running time, a series' seasons, the cast,
-Back on the screen and on the remote). OK opened the title itself on DRTV (whether it was running or not), on
+Back on the screen and on the remote), and ▶ Trailer (playing inside the app, pause, seek and Back). OK opened the title itself on DRTV (whether it was running or not), on
 Viaplay, on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already
 running, and Prime Video's search for The Joy of Painting, which Movie of the Night has no link for. Disney+
 opened the title from a link of the same form sent by hand.

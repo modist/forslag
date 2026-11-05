@@ -116,7 +116,11 @@ public class MainActivity extends Activity {
     /** The detail page OK on a title shows over the rows, until Back. */
     private FrameLayout detail;
     private ImageView detailBackdrop, detailPoster;
-    private TextView detailTitle, detailMeta, detailCast, detailOverview, backButton;
+    private TextView detailTitle, detailMeta, detailCast, detailOverview, backButton, trailerButton;
+    /** The poster and the Trailer button on it. */
+    private FrameLayout posterFrame;
+    /** The trailer player, full screen over everything while it plays. */
+    private Trailer trailer;
     /** The Watch buttons, one per service that has the title, and Back below them. */
     private LinearLayout detailButtons;
     /** The title on the detail page, and the tile the focus goes back to when it closes. */
@@ -449,6 +453,7 @@ public class MainActivity extends Activity {
         col.addView(foot);
 
         buildDetail(root);
+        trailer = new Trailer(this, root);
         status.setText(R.string.loading);
         setContentView(root);
     }
@@ -487,7 +492,26 @@ public class MainActivity extends Activity {
         GradientDrawable shape = new GradientDrawable();
         shape.setCornerRadius(dp(8));
         detailPoster.setBackground(shape);
-        left.addView(detailPoster, new LinearLayout.LayoutParams(-1, dp(250)));
+        // The poster, with Trailer on it: see-through until it has the focus (Up from the first button).
+        posterFrame = new FrameLayout(this);
+        posterFrame.addView(detailPoster, new FrameLayout.LayoutParams(-1, -1));
+        trailerButton = oneLine(text(15, Typeface.BOLD, 0xFFFFFFFF));
+        trailerButton.setText(R.string.trailer_play);
+        trailerButton.setPadding(dp(18), dp(10), dp(20), dp(10));
+        trailerButton.setFocusable(true);
+        StateListDrawable on = new StateListDrawable();
+        on.addState(new int[] {android.R.attr.state_focused}, pill(accent, 0xFFFFFFFF));
+        on.addState(new int[] {}, pill(0x99000000, 0x80FFFFFF));
+        trailerButton.setBackground(on);
+        trailerButton.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}},
+                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        trailerButton.setVisibility(View.GONE);
+        trailerButton.setOnClickListener(v -> {
+            if (detailOf != null && detailOf.details != null) trailer.play(detailOf.details.trailer);
+        });
+        posterFrame.addView(trailerButton, new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        ((FrameLayout.LayoutParams) trailerButton.getLayoutParams()).setMargins(0, 0, 0, dp(14));
+        left.addView(posterFrame, new LinearLayout.LayoutParams(-1, dp(250)));
         // The buttons scroll with the focus when a title is on more services than fit below the poster.
         ScrollView scroll = new ScrollView(this);
         scroll.setVerticalScrollBarEnabled(false);
@@ -553,6 +577,19 @@ public class MainActivity extends Activity {
         }
         if (backButton.getParent() != null) ((ViewGroup) backButton.getParent()).removeView(backButton);
         detailButtons.addView(backButton, stacked(detailButtons.getChildCount() > 0 ? dp(12) : 0));
+        placeTrailer(t);
+    }
+
+    /**
+     * "▶ Trailer" on the poster, once TMDb's details name a YouTube trailer for t; it plays here, in YouTube's
+     * embedded player (Trailer). Hidden without one. On the poster it takes no room from the service buttons. The
+     * focus stays where it is.
+     */
+    private void placeTrailer(Suggestions.Title t) {
+        boolean has = t.details != null && !t.details.trailer.isEmpty();
+        if (!has && trailerButton.hasFocus()) firstButton().requestFocus();
+        trailerButton.setVisibility(has ? View.VISIBLE : View.GONE);
+        posterFrame.setVisibility(has || !t.poster.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     /** A smaller size, down to 12sp, for a service name too long for its button ("Amazon Prime Video"). */
@@ -618,7 +655,8 @@ public class MainActivity extends Activity {
         if (t.details == null && t.id > 0) fetchDetails(t);
         detailOverview.setText(t.overview);
         detailOverview.setVisibility(t.overview.isEmpty() ? View.GONE : View.VISIBLE);
-        detailPoster.setVisibility(t.poster.isEmpty() ? View.GONE : View.VISIBLE);
+        posterFrame.setVisibility(t.poster.isEmpty() ? View.GONE : View.VISIBLE);
+        if (t.poster.isEmpty()) detailPoster.setImageDrawable(null);
         if (!t.poster.isEmpty()) images.load(detailPoster, t.poster);
         if (t.backdrop.isEmpty()) {
             detailBackdrop.setTag(null);
@@ -661,20 +699,25 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             Suggestions.Details d;
             try {
-                d = Suggestions.parseDetails(tmdb.json(Suggestions.detailsPath(t, language)), t.tv, CAST_MAX);
+                d = Suggestions.parseDetails(tmdb.json(Suggestions.detailsPath(t, language)), t.tv, CAST_MAX,
+                        language);
             } catch (Exception e) {
                 Log.w(TAG, "details " + t.id + ": " + e);
                 return;
             }
             main.post(() -> {
                 t.details = d;
-                if (t == detailOf && !isDestroyed()) showDetails(t);
+                if (t == detailOf && !isDestroyed()) {
+                    showDetails(t);
+                    placeTrailer(t);
+                }
             });
         }).start();
     }
 
     /** Back to the rows, on the tile the detail page came from (or the first, if the rows were filled meanwhile). */
     private void hideDetail() {
+        trailer.close();
         detail.setVisibility(View.GONE);
         content.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         View back = returnTo != null && returnTo.isAttachedToWindow() ? returnTo : firstTile();
@@ -685,6 +728,7 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        if (trailer.showing() && trailer.key(e)) return true;
         if (e.getKeyCode() == KeyEvent.KEYCODE_BACK && detail.getVisibility() == View.VISIBLE) {
             if (e.getAction() == KeyEvent.ACTION_UP) hideDetail();
             return true;
@@ -704,8 +748,16 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        // Home or another app: the trailer's sound stops with it.
+        trailer.close();
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        trailer.close();
         main.removeCallbacksAndMessages(null);
         images.shutdown();
     }

@@ -11,6 +11,7 @@
     <string name="unmatched">Ikke på TMDb: %1$s</string>
     <string name="updated">Opdateret %1$s</string>
     <string name="back">Tilbage</string>
+    <string name="trailer_error">YouTube vil ikke afspille traileren her. Tryk Tilbage.</string>
     <plurals name="seasons">
         <item quantity="one">%d sæson</item>
         <item quantity="other">%d sæsoner</item>

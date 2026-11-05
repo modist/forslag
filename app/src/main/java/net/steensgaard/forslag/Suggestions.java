@@ -322,12 +322,46 @@ final class Suggestions {
         /** runtime is in minutes. */
         int seasons, episodes, runtime;
         final List<String> cast = new ArrayList<>();
+        /** The YouTube id of the best trailer (see trailer), or "" when TMDb lists none. */
+        String trailer = "";
     }
 
-    /** A title's details and cast in one request; a series' aggregate_credits counts the actors of every season. */
+    /**
+     * A title's details, cast and videos in one request; a series' aggregate_credits counts the actors of every
+     * season. Videos in the configured language, in English, and those without a language.
+     */
     static String detailsPath(Title t, String language) {
+        String lang = language.contains("-") ? language.substring(0, language.indexOf('-')) : language;
         return "/" + (t.tv ? "tv" : "movie") + "/" + t.id + "?append_to_response="
-                + (t.tv ? "aggregate_credits" : "credits") + "&language=" + language;
+                + (t.tv ? "aggregate_credits" : "credits") + "%2Cvideos&include_video_language=" + lang
+                + "%2Cen%2Cnull&language=" + language;
+    }
+
+    /**
+     * The YouTube id of the trailer to show, from TMDb's videos: YouTube only; a Trailer before a Teaser; the
+     * configured language before English before none; an official one before a fan upload. "" when none fits.
+     */
+    static String trailer(JSONObject json, String language) {
+        JSONObject videos = json.optJSONObject("videos");
+        JSONArray list = videos == null ? null : videos.optJSONArray("results");
+        String lang = language.contains("-") ? language.substring(0, language.indexOf('-')) : language;
+        String best = "";
+        int bestScore = -1;
+        for (int i = 0; list != null && i < list.length(); i++) {
+            JSONObject v = list.optJSONObject(i);
+            if (v == null || !"YouTube".equals(v.optString("site")) || v.optString("key", "").isEmpty()) continue;
+            String type = v.optString("type");
+            int score = type.equals("Trailer") ? 8 : type.equals("Teaser") ? 4 : -1;
+            if (score < 0) continue;
+            String l = v.optString("iso_639_1", "");
+            score += l.equals(lang) ? 2 : l.equals("en") ? 1 : 0;
+            if (v.optBoolean("official")) score += 1;
+            if (score > bestScore) {
+                bestScore = score;
+                best = v.optString("key");
+            }
+        }
+        return best;
     }
 
     static Details parseDetails(JSONObject json, boolean tv, int castMax) {
@@ -345,6 +379,12 @@ final class Suggestions {
             String name = p == null ? "" : p.optString("name", "").trim();
             if (!name.isEmpty() && !d.cast.contains(name)) d.cast.add(name);
         }
+        return d;
+    }
+
+    static Details parseDetails(JSONObject json, boolean tv, int castMax, String language) {
+        Details d = parseDetails(json, tv, castMax);
+        d.trailer = trailer(json, language);
         return d;
     }
 

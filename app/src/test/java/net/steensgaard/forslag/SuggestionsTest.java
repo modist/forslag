@@ -123,7 +123,8 @@ public class SuggestionsTest {
     public void detailsReadSeasonsForSeriesAndTheFirstActors() throws Exception {
         Suggestions.Title from = title(124364);
         from.tv = true;
-        assertEquals("/tv/124364?append_to_response=aggregate_credits&language=da-DK",
+        assertEquals("/tv/124364?append_to_response=aggregate_credits%2Cvideos"
+                + "&include_video_language=da%2Cen%2Cnull&language=da-DK",
                 Suggestions.detailsPath(from, "da-DK"));
         JSONObject series = new JSONObject("{\"number_of_seasons\":3,\"number_of_episodes\":30,"
                 + "\"aggregate_credits\":{\"cast\":[{\"name\":\"Harold Perrineau\"},{\"name\":\"Catalina Sandino Moreno\"},"
@@ -144,6 +145,25 @@ public class SuggestionsTest {
         assertEquals(0, d.runtime);
         assertEquals(Arrays.asList("Christian Bale"), m.cast);
         assertTrue(Suggestions.parseDetails(new JSONObject("{}"), false, 5).cast.isEmpty());
+    }
+
+    @Test
+    public void picksTheTrailerFromTmdbVideos() throws Exception {
+        JSONObject json = new JSONObject("{\"videos\":{\"results\":["
+                + "{\"site\":\"YouTube\",\"key\":\"clip\",\"type\":\"Clip\",\"iso_639_1\":\"da\",\"official\":true},"
+                + "{\"site\":\"Vimeo\",\"key\":\"vimeo\",\"type\":\"Trailer\",\"iso_639_1\":\"da\",\"official\":true},"
+                + "{\"site\":\"YouTube\",\"key\":\"teaserDa\",\"type\":\"Teaser\",\"iso_639_1\":\"da\",\"official\":true},"
+                + "{\"site\":\"YouTube\",\"key\":\"fanEn\",\"type\":\"Trailer\",\"iso_639_1\":\"en\",\"official\":false},"
+                + "{\"site\":\"YouTube\",\"key\":\"officialEn\",\"type\":\"Trailer\",\"iso_639_1\":\"en\",\"official\":true}]}}");
+        // A trailer beats a teaser, an official one a fan upload; Vimeo and clips are skipped.
+        assertEquals("officialEn", Suggestions.trailer(json, "da-DK"));
+        assertEquals("officialEn", Suggestions.parseDetails(json, false, 5, "da-DK").trailer);
+        JSONObject danish = new JSONObject("{\"videos\":{\"results\":["
+                + "{\"site\":\"YouTube\",\"key\":\"en\",\"type\":\"Trailer\",\"iso_639_1\":\"en\",\"official\":true},"
+                + "{\"site\":\"YouTube\",\"key\":\"da\",\"type\":\"Trailer\",\"iso_639_1\":\"da\",\"official\":true}]}}");
+        assertEquals("da", Suggestions.trailer(danish, "da-DK"));
+        assertEquals("en", Suggestions.trailer(danish, "en-GB"));
+        assertEquals("", Suggestions.trailer(new JSONObject("{}"), "da-DK"));
     }
 
     @Test
