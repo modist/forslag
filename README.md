@@ -2,7 +2,7 @@
 
 What is included in your own streaming subscriptions right now, on one Android TV screen.
 
-![Forslag on a Philips Android TV: Drama and Comedy both on in the movie row, so it shows only comedy-dramas, with Den stygge stedsøster focused; Refresh, Sort, Age and Top rated at the top](screenshots/main.jpg)
+![Forslag on a Philips Android TV: the movie row, the series row with Comedy on, and the Saved for later row at the bottom, with The Equalizer focused; ↻, Sort, Age and ★ at the top](screenshots/main.jpg)
 
 [![A one-minute video on YouTube: from the Clean Your TV launcher into Forslag, a genre, Sort and Top rated, and a title opened in HBO Max](https://img.youtube.com/vi/KY-__0FU64A/maxresdefault.jpg)](https://youtu.be/KY-__0FU64A)
 
@@ -27,7 +27,7 @@ the year and rating, a movie's running time or a series' seasons and episodes, t
 plot, with room down to the bottom of the screen. A running series also says when its next episode comes
 ("Next episode Thursday, 10 December (S6 E3)", or "Season 4 starts …"), or that one came out this week.
 
-![The detail page for Ghosts: poster with the Trailer button on it, the TV 2 and Netflix buttons and Back on the left; year, rating, seasons and episodes, the next episode, the actors and the plot on the right](screenshots/series.jpg)
+![The detail page for Remember the Titans: poster with the ✓ (saved) and 🎬 (trailer) icons on it, the Disney Plus button and Back on the left; year, rating, running time, the actors and the plot on the right](screenshots/detail.jpg)
 
 Below the poster is a button for each of your services that has the title, with the app's own icon, in the
 order of `config.xml`; the focus starts on the first one whose app is installed. A button opens the title in
@@ -58,9 +58,9 @@ their series that are on your services, most popular first. OK on a title there 
 back the way you came, to the actor and then to the title you started from. Talk shows, news, appearances as
 themselves and titles with few votes are left out.
 
-![Fight Club's detail page with Brad Pitt focused among the actors](screenshots/cast.jpg)
+![Remember the Titans' detail page with Denzel Washington focused among the actors](screenshots/cast.jpg)
 
-![Brad Pitt's page: photo, birth and biography at the top, then his films (Fight Club, Seven, Fury, Once Upon a Time in Hollywood and more) and his series (Friends, King of the Hill, Dave) on your services](screenshots/actor.jpg)
+![Denzel Washington's page: photo, birth and biography at the top, then his films on your services (Training Day, The Equalizer, The Magnificent Seven, Man on Fire, American Gangster and more)](screenshots/actor.jpg)
 
 It is an ordinary Android TV app (Android 8 and later), and it also declares a module card for the
 [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher, so it can sit in that launcher's dock
