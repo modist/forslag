@@ -69,6 +69,8 @@ public class MainActivity extends Activity {
     private static final long GENRE_DELAY_MS = 700;
     /** The width of the poster on the detail page, and of the buttons below it, in dp. */
     private static final int POSTER_W = 180;
+    /** A poster tile in the rows, in dp: small enough that the top of a third row shows under two. */
+    private static final int TILE_W = 86, TILE_H = 127;
     /** How many actors the detail page names. */
     private static final int CAST_MAX = 6;
     /** How many of an actor's best-known titles are checked for your services. */
@@ -79,7 +81,7 @@ public class MainActivity extends Activity {
     private Tmdb tmdb;
     private Images images;
     private ImageView backdrop;
-    private TextView title, meta, overview, status;
+    private TextView title, meta, overview;
     private Section movies, series;
     private String region, language;
     private int perRow, minVotes;
@@ -141,6 +143,10 @@ public class MainActivity extends Activity {
     /** The title on the detail page, and the tile the focus goes back to when it closes. */
     private Suggestions.Title detailOf;
     private View returnTo;
+    /** "Saved for later", kept in the app's files; its row is below the series, and hidden while it is empty. */
+    private Watchlist saved;
+    private TextView savedHead, saveButton;
+    private LinearLayout savedRow;
 
     /** The movie or series row: its genre tabs, its tiles, and the rows already fetched, by genre. */
     private final class Section {
@@ -162,8 +168,8 @@ public class MainActivity extends Activity {
             LinearLayout head = new LinearLayout(MainActivity.this);
             head.setOrientation(LinearLayout.HORIZONTAL);
             head.setGravity(Gravity.CENTER_VERTICAL);
-            head.setPadding(0, dp(8), 0, dp(2));
-            TextView name = text(16, Typeface.BOLD, 0xE6FFFFFF);
+            head.setPadding(0, dp(4), 0, dp(1));
+            TextView name = text(13, Typeface.BOLD, 0xE6FFFFFF);
             name.setText(label);
             name.setPadding(0, 0, dp(16), 0);
             head.addView(name);
@@ -177,8 +183,9 @@ public class MainActivity extends Activity {
             for (Suggestions.Genre g : Suggestions.GENRES) {
                 if (g.offered(tv)) strip.addView(tab(g));
             }
-            col.addView(head);
-            row = row(col);
+            LinearLayout block = block(col);
+            block.addView(head);
+            row = row(block);
             mark();
         }
 
@@ -342,7 +349,8 @@ public class MainActivity extends Activity {
         tmdb.refresh();
         streams.clear();
         refreshing = true;
-        status.setText(R.string.loading);
+        // The icon turns while the sources are asked.
+        refreshButton.animate().rotationBy(360f * 30).setDuration(30_000).setInterpolator(null).start();
         load();
     }
 
@@ -401,7 +409,9 @@ public class MainActivity extends Activity {
         title.setMaxWidth(titleMax);
         header.addView(title, new LinearLayout.LayoutParams(-2, -2));
         topToggle = text(13, Typeface.NORMAL, 0xFFFFFFFF);
-        topToggle.setText(getString(R.string.top_rated, getString(R.string.top_rated_min)));
+        // Only the star; what it does is said to TalkBack.
+        topToggle.setText(R.string.top_rated_icon);
+        topToggle.setContentDescription(getString(R.string.top_rated, getString(R.string.top_rated_min)));
         topToggle.setPadding(dp(12), dp(4), dp(12), dp(4));
         topToggle.setBackground(tabBackground());
         topToggle.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_selected}, {}},
@@ -424,10 +434,18 @@ public class MainActivity extends Activity {
         ageButton.setOnClickListener(v -> nextAge());
         ageButton.setVisibility(ages.isEmpty() ? View.GONE : View.VISIBLE);
         if (!ages.isEmpty()) showAge();
-        refreshButton = text(13, Typeface.NORMAL, 0xFFFFFFFF);
-        refreshButton.setText(R.string.refresh);
-        refreshButton.setPadding(dp(12), dp(4), dp(12), dp(4));
-        refreshButton.setBackground(tabBackground());
+        // Refresh: an icon, faint until it has the focus, left of the other buttons in the corner.
+        refreshButton = text(15, Typeface.BOLD, 0xFFFFFFFF);
+        refreshButton.setText(R.string.refresh_icon);
+        refreshButton.setContentDescription(getString(R.string.refresh));
+        refreshButton.setGravity(Gravity.CENTER);
+        refreshButton.setPadding(dp(10), dp(3), dp(10), dp(3));
+        StateListDrawable faint = new StateListDrawable();
+        faint.addState(new int[] {android.R.attr.state_focused}, pill(0x40FFFFFF, 0xFFFFFFFF));
+        faint.addState(new int[] {}, pill(0x0FFFFFFF, 0));
+        refreshButton.setBackground(faint);
+        refreshButton.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}},
+                new int[] {0xFFFFFFFF, 0x59FFFFFF}));
         // Usable from the start, so a first load that failed can be tried again.
         refreshButton.setFocusable(true);
         refreshButton.setOnClickListener(v -> refresh());
@@ -435,6 +453,7 @@ public class MainActivity extends Activity {
         controls.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
         gap.setMargins(0, 0, dp(8), 0);
+        controls.addView(refreshButton, gap);
         controls.addView(sortButton, gap);
         controls.addView(ageButton, gap);
         controls.addView(topToggle);
@@ -453,24 +472,59 @@ public class MainActivity extends Activity {
         overview.setLineSpacing(0, 1.15f);
         header.addView(overview, new LinearLayout.LayoutParams(Math.round(getResources().getDisplayMetrics().widthPixels * 0.6f), -2));
 
-        movies = new Section(col, false, R.string.movies);
-        series = new Section(col, true, R.string.series);
+        // The rows scroll up and down with the focus under the header, which stays: two fit on the screen, and with
+        // "Saved for later" there are three. Out to the screen's sides, so a row still runs on to the right edge.
+        final LinearLayout rows = new LinearLayout(this);
+        // A whole row at a time, its heading with it: the one the focus is in is scrolled fully into view.
+        ScrollView rowsScroll = new ScrollView(this) {
+            @Override
+            public void requestChildFocus(View child, View focused) {
+                super.requestChildFocus(child, focused);
+                View block = focused;
+                while (block != null && block.getParent() != rows) {
+                    block = block.getParent() instanceof View ? (View) block.getParent() : null;
+                }
+                if (block == null) return;
+                int y = getScrollY(), to = y;
+                if (block.getBottom() > y + getHeight()) to = block.getBottom() - getHeight();
+                if (block.getTop() < to) to = block.getTop();
+                if (to != y) smoothScrollTo(0, to);
+            }
+        };
+        rowsScroll.setVerticalScrollBarEnabled(false);
+        rowsScroll.setClipToPadding(false);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        rows.setPadding(dp(48), 0, dp(48), dp(4));
+        rows.setClipToPadding(false);
+        rows.setClipChildren(false);
+        rowsScroll.addView(rows);
+        // col draws its children unclipped (the rows run past its padding), so the scrolled rows are cut at the
+        // edges of the scroll view by this frame instead, clear of the header and of Refresh.
+        FrameLayout rowsFrame = new FrameLayout(this);
+        rowsFrame.setClipChildren(true);
+        rowsFrame.addView(rowsScroll, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, 0, 1f);
+        rlp.setMargins(dp(-48), 0, dp(-48), 0);
+        col.addView(rowsFrame, rlp);
+        movies = new Section(rows, false, R.string.movies);
+        series = new Section(rows, true, R.string.series);
+        // Saved for later, at the bottom.
+        LinearLayout savedBlock = block(rows);
+        savedHead = text(13, Typeface.BOLD, 0xE6FFFFFF);
+        savedHead.setText(R.string.saved_row);
+        savedHead.setPadding(0, dp(6), 0, dp(3));
+        savedBlock.addView(savedHead);
+        savedRow = row(savedBlock);
 
-        View spacer = new View(this);
-        col.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
-        // Refresh sits by the time of the last update, at the bottom: Down from the series row.
-        LinearLayout foot = new LinearLayout(this);
-        foot.setOrientation(LinearLayout.HORIZONTAL);
-        foot.setGravity(Gravity.CENTER_VERTICAL);
-        foot.addView(refreshButton, gap);
-        status = oneLine(text(12, Typeface.NORMAL, 0x80FFFFFF));
-        foot.addView(status, new LinearLayout.LayoutParams(0, -2, 1f));
-        col.addView(foot);
+        saved = readSaved();
+        showSaved();
+
 
         buildPerson(root);
         buildDetail(root);
         trailer = new Trailer(this, root);
-        status.setText(R.string.loading);
+        placeholder(movies, R.string.loading);
+        placeholder(series, R.string.loading);
         setContentView(root);
     }
 
@@ -507,26 +561,34 @@ public class MainActivity extends Activity {
         detailPoster.setClipToOutline(true);
         GradientDrawable shape = new GradientDrawable();
         shape.setCornerRadius(dp(8));
+        // Seen only for a title without a poster, behind the buttons.
+        shape.setColor(0x1FFFFFFF);
         detailPoster.setBackground(shape);
-        // The poster, with Trailer on it: see-through until it has the focus (Up from the first button).
+        // The poster, with Save and Trailer on it: see-through until they have the focus (Up from the first button).
         posterFrame = new FrameLayout(this);
         posterFrame.addView(detailPoster, new FrameLayout.LayoutParams(-1, -1));
-        trailerButton = oneLine(text(15, Typeface.BOLD, 0xFFFFFFFF));
-        trailerButton.setText(R.string.trailer_play);
-        trailerButton.setPadding(dp(18), dp(10), dp(20), dp(10));
-        trailerButton.setFocusable(true);
-        StateListDrawable on = new StateListDrawable();
-        on.addState(new int[] {android.R.attr.state_focused}, pill(accent, 0xFFFFFFFF));
-        on.addState(new int[] {}, pill(0x99000000, 0x80FFFFFF));
-        trailerButton.setBackground(on);
-        trailerButton.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}},
-                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        // Side by side, icons only: Save (＋, ✓ once saved) and Trailer (▶).
+        LinearLayout onPoster = new LinearLayout(this);
+        onPoster.setOrientation(LinearLayout.HORIZONTAL);
+        onPoster.setGravity(Gravity.CENTER_VERTICAL);
+        saveButton = posterButton();
+        saveButton.setOnClickListener(v -> {
+            if (detailOf != null) toggleSaved(detailOf);
+        });
+        onPoster.addView(saveButton);
+        trailerButton = posterButton();
+        trailerButton.setText(R.string.trailer_icon);
+        trailerButton.setContentDescription(getString(R.string.trailer_play));
         trailerButton.setVisibility(View.GONE);
         trailerButton.setOnClickListener(v -> {
             if (detailOf != null && detailOf.details != null) trailer.play(detailOf.details.trailer);
         });
-        posterFrame.addView(trailerButton, new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
-        ((FrameLayout.LayoutParams) trailerButton.getLayoutParams()).setMargins(0, 0, 0, dp(14));
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-2, -2);
+        tlp.setMargins(dp(12), 0, 0, 0);
+        onPoster.addView(trailerButton, tlp);
+        FrameLayout.LayoutParams olp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        olp.setMargins(0, 0, 0, dp(14));
+        posterFrame.addView(onPoster, olp);
         left.addView(posterFrame, new LinearLayout.LayoutParams(-1, dp(250)));
         // The buttons scroll with the focus when a title is on more services than fit below the poster.
         ScrollView scroll = new ScrollView(this);
@@ -640,12 +702,12 @@ public class MainActivity extends Activity {
         personStatus = text(15, Typeface.NORMAL, 0x99FFFFFF);
         personStatus.setPadding(0, dp(12), 0, 0);
         col.addView(personStatus);
-        personMoviesLabel = text(16, Typeface.BOLD, 0xE6FFFFFF);
+        personMoviesLabel = text(13, Typeface.BOLD, 0xE6FFFFFF);
         personMoviesLabel.setText(R.string.movies);
         personMoviesLabel.setPadding(0, dp(8), 0, dp(2));
         col.addView(personMoviesLabel);
         personMovies = row(col);
-        personSeriesLabel = text(16, Typeface.BOLD, 0xE6FFFFFF);
+        personSeriesLabel = text(13, Typeface.BOLD, 0xE6FFFFFF);
         personSeriesLabel.setText(R.string.series);
         personSeriesLabel.setPadding(0, dp(8), 0, dp(2));
         col.addView(personSeriesLabel);
@@ -853,7 +915,180 @@ public class MainActivity extends Activity {
         boolean has = t.details != null && !t.details.trailer.isEmpty();
         if (!has && trailerButton.hasFocus()) firstButton().requestFocus();
         trailerButton.setVisibility(has ? View.VISIBLE : View.GONE);
-        posterFrame.setVisibility(has || !t.poster.isEmpty() ? View.VISIBLE : View.GONE);
+    }
+
+    /** A button on the poster: dark and see-through, filled with the accent while focused. */
+    private TextView posterButton() {
+        TextView b = oneLine(text(17, Typeface.BOLD, 0xFFFFFFFF));
+        b.setGravity(Gravity.CENTER);
+        b.setMinWidth(dp(44));
+        b.setMinHeight(dp(44));
+        b.setPadding(0, 0, 0, 0);
+        b.setFocusable(true);
+        StateListDrawable on = new StateListDrawable();
+        on.addState(new int[] {android.R.attr.state_focused}, round(pill(accent, 0xFFFFFFFF)));
+        on.addState(new int[] {}, round(pill(0x99000000, 0x80FFFFFF)));
+        b.setBackground(on);
+        b.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}},
+                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        return b;
+    }
+
+    /** "＋ Save" or "✓ Saved" on the detail page's poster, for the title it shows. */
+    private void markSave() {
+        if (detailOf == null) return;
+        boolean has = saved.has(detailOf);
+        saveButton.setText(has ? R.string.saved_icon : R.string.save_icon);
+        saveButton.setContentDescription(getString(has ? R.string.saved_on : R.string.save));
+    }
+
+    /**
+     * Saves t for later or removes it (Save on the detail page, or OK held on a tile), says so, and shows the row
+     * anew; the focus stays in it if it was there.
+     */
+    private void toggleSaved(Suggestions.Title t) {
+        boolean now = saved.toggle(t, System.currentTimeMillis());
+        writeSaved();
+        Toast.makeText(this, getString(now ? R.string.saved_toast : R.string.removed_toast, t.name),
+                Toast.LENGTH_SHORT).show();
+        View focus = getCurrentFocus();
+        int at = focus != null && focus.getParent() == savedRow ? savedRow.indexOfChild(focus) : -1;
+        showSaved();
+        if (at >= 0) {
+            View next = savedRow.getChildCount() > 0 ? savedRow.getChildAt(Math.min(at, savedRow.getChildCount() - 1))
+                    : firstTile();
+            if (next != null) next.requestFocus();
+        }
+        markSave();
+    }
+
+    /** The "Saved for later" row, or none while nothing is saved. */
+    private void showSaved() {
+        savedRow.removeAllViews();
+        List<Suggestions.Title> list = saved.shown();
+        for (Suggestions.Title t : list) savedRow.addView(savedTile(t));
+        int shown = list.isEmpty() ? View.GONE : View.VISIBLE;
+        ((View) savedHead.getParent()).setVisibility(shown);
+    }
+
+    /** A tile in the saved row: dimmed when no service of yours has it now, marked when a series has a new episode. */
+    private View savedTile(Suggestions.Title t) {
+        FrameLayout tile = (FrameLayout) tile(t, this::describeSaved);
+        tile.setTag(Watchlist.key(t));
+        if (t.services.isEmpty()) {
+            for (int i = 0; i < tile.getChildCount(); i++) tile.getChildAt(i).setAlpha(0.35f);
+        }
+        if (newEpisode(t.details)) {
+            TextView badge = oneLine(text(11, Typeface.BOLD, 0xFF15171C));
+            badge.setText(R.string.new_episode_badge);
+            badge.setPadding(dp(6), dp(2), dp(6), dp(2));
+            badge.setBackground(pill(accent, 0));
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            lp.setMargins(dp(4), 0, dp(4), dp(6));
+            tile.addView(badge, lp);
+        }
+        return tile;
+    }
+
+    /** A focused saved title: as in the other rows, and "Not on your services right now" where that is so. */
+    private void describeSaved(Suggestions.Title t) {
+        describe(t);
+        if (t.services.isEmpty()) {
+            String line = metaLine(t, false);
+            meta.setText(line.isEmpty() ? getString(R.string.not_available)
+                    : line + "  ·  " + getString(R.string.not_available));
+        }
+    }
+
+    /** Whether a series' latest episode came out in the last week. */
+    private static boolean newEpisode(Suggestions.Details d) {
+        if (d == null || d.last.date.isEmpty()) return false;
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
+        return d.last.date.compareTo(today) <= 0 && daysAgo(d.last.date) <= 7;
+    }
+
+    /** The services in config.xml, as the saved titles name them before the first load has matched them on TMDb. */
+    private List<Suggestions.Service> configured() {
+        List<Suggestions.Service> services = new ArrayList<>();
+        for (String line : getResources().getStringArray(R.array.services)) {
+            Suggestions.Service s = Suggestions.parseService(line);
+            if (s != null) services.add(s);
+        }
+        return services;
+    }
+
+    private File savedFile() {
+        return new File(getFilesDir(), "saved.json");
+    }
+
+    private Watchlist readSaved() {
+        try {
+            return Watchlist.parse(new String(Files.readAllBytes(savedFile().toPath()), StandardCharsets.UTF_8),
+                    configured());
+        } catch (Exception e) {
+            return Watchlist.parse("[]", Collections.emptyList());
+        }
+    }
+
+    /** Writes the list through a temporary file, so a crash halfway leaves the last one. */
+    private void writeSaved() {
+        try {
+            File tmp = new File(getFilesDir(), "saved.json.tmp");
+            Files.write(tmp.toPath(), saved.toJson().getBytes(StandardCharsets.UTF_8));
+            if (!tmp.renameTo(savedFile())) tmp.delete();
+        } catch (Exception e) {
+            Log.w(TAG, "save list: " + e);
+        }
+    }
+
+    /**
+     * After a load: which of your services have each saved title now (TMDb for its titles; DRTV and Viaplay keep
+     * the ones it was saved with), and a saved series' latest episode, for the badge. Cached like every answer.
+     */
+    private void checkSaved() {
+        final List<Suggestions.Title> list = saved.titles();
+        final List<Suggestions.Service> services = found;
+        if (list.isEmpty()) return;
+        new Thread(() -> {
+            Map<Suggestions.Title, List<Suggestions.Service>> on = new HashMap<>();
+            Map<Suggestions.Title, Suggestions.Details> details = new HashMap<>();
+            for (Suggestions.Title t : list) {
+                Set<String> had = new java.util.HashSet<>();
+                for (Suggestions.Service s : t.services) had.add(s.names[0]);
+                Set<Integer> streaming = t.id > 0 ? streamsOn(t) : null;
+                List<Suggestions.Service> now = new ArrayList<>();
+                for (Suggestions.Service s : services) {
+                    boolean was = had.contains(s.names[0]);
+                    if ((s.own() || streaming == null) ? was : streaming.contains(s.providerId)) now.add(s);
+                }
+                on.put(t, now);
+                if (t.tv && t.id > 0 && t.details == null) {
+                    try {
+                        details.put(t, Suggestions.parseDetails(tmdb.json(Suggestions.detailsPath(t, language)), true,
+                                CAST_MAX, language));
+                    } catch (Exception e) {
+                        Log.w(TAG, "saved details " + t.id + ": " + e);
+                    }
+                }
+            }
+            main.post(() -> {
+                if (isDestroyed()) return;
+                for (Map.Entry<Suggestions.Title, List<Suggestions.Service>> e : on.entrySet()) {
+                    e.getKey().services.clear();
+                    e.getKey().services.addAll(e.getValue());
+                }
+                for (Map.Entry<Suggestions.Title, Suggestions.Details> e : details.entrySet()) {
+                    if (e.getKey().details == null) e.getKey().details = e.getValue();
+                }
+                writeSaved();
+                View focus = getCurrentFocus();
+                Object key = focus != null && focus.getParent() == savedRow ? focus.getTag() : null;
+                showSaved();
+                for (int i = 0; key != null && i < savedRow.getChildCount(); i++) {
+                    if (key.equals(savedRow.getChildAt(i).getTag())) savedRow.getChildAt(i).requestFocus();
+                }
+            });
+        }).start();
     }
 
     /** A smaller size, down to 12sp, for a service name too long for its button ("Amazon Prime Video"). */
@@ -919,7 +1154,7 @@ public class MainActivity extends Activity {
         if (t.details == null && t.id > 0) fetchDetails(t);
         detailOverview.setText(t.overview);
         detailOverview.setVisibility(t.overview.isEmpty() ? View.GONE : View.VISIBLE);
-        posterFrame.setVisibility(t.poster.isEmpty() ? View.GONE : View.VISIBLE);
+        markSave();
         if (t.poster.isEmpty()) detailPoster.setImageDrawable(null);
         if (!t.poster.isEmpty()) images.load(detailPoster, t.poster);
         if (t.backdrop.isEmpty()) {
@@ -1058,7 +1293,7 @@ public class MainActivity extends Activity {
         boolean person = personPage.getVisibility() == View.VISIBLE;
         (person ? personPage : content).setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         View back = returnTo != null && returnTo.isAttachedToWindow() ? returnTo
-                : person ? firstPersonTile() : firstTile();
+                : person ? firstPersonTile() : savedTileOf(detailOf);
         if (back != null) back.requestFocus();
         detailOf = null;
         returnTo = null;
@@ -1079,7 +1314,16 @@ public class MainActivity extends Activity {
     }
 
     private View firstTile() {
-        return movies.row.getChildCount() > 0 ? movies.row.getChildAt(0) : series.row.getChildAt(0);
+        if (movies.row.getChildCount() > 0) return movies.row.getChildAt(0);
+        return series.row.getChildCount() > 0 ? series.row.getChildAt(0) : savedRow.getChildAt(0);
+    }
+
+    /** The saved row's tile for t (shown anew since the detail page opened), else the first tile. */
+    private View savedTileOf(Suggestions.Title t) {
+        for (int i = 0; t != null && i < savedRow.getChildCount(); i++) {
+            if (Watchlist.key(t).equals(savedRow.getChildAt(i).getTag())) return savedRow.getChildAt(i);
+        }
+        return firstTile();
     }
 
     @Override
@@ -1116,15 +1360,12 @@ public class MainActivity extends Activity {
     private void load() {
         if (loading) return;
         if (BuildConfig.TMDB_KEY.isEmpty()) {
-            status.setText(R.string.no_key);
+            placeholder(movies, R.string.no_key);
+            placeholder(series, R.string.no_key);
             return;
         }
         loading = true;
-        List<Suggestions.Service> services = new ArrayList<>();
-        for (String line : getResources().getStringArray(R.array.services)) {
-            Suggestions.Service s = Suggestions.parseService(line);
-            if (s != null) services.add(s);
-        }
+        List<Suggestions.Service> services = configured();
         final boolean top = topRated;
         final String maxAge = age;
         new Thread(() -> {
@@ -1182,7 +1423,8 @@ public class MainActivity extends Activity {
                             Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genres, minRating,
                                     maxAge)), tv);
                     // With several genres TMDb can't be asked for all of them in every case (see withGenres).
-                    if (genres.size() > 1) l = Suggestions.matchingAll(genres, l);
+                    // Keyword genres (romance on series) were asked of TMDb and can't be checked from genre ids.
+                    if (genres.size() > 1) l = Suggestions.matchingAll(Suggestions.byIds(tv, genres), l);
                 }
             } catch (Tmdb.KeyRefused e) {
                 throw e;
@@ -1362,12 +1604,21 @@ public class MainActivity extends Activity {
             // After Refresh the focus stays on the button.
             View first = firstTile();
             if (first != null && !refreshing) first.requestFocus();
+            checkSaved();
         }
         refreshing = false;
-        StringBuilder line = new StringBuilder(r.error != 0 ? getString(r.error)
-                : getString(R.string.updated, new SimpleDateFormat("HH:mm", Locale.ROOT).format(new Date())));
-        if (!r.unmatched.isEmpty()) line.append("  ·  ").append(getString(R.string.unmatched, TextUtils.join(", ", r.unmatched)));
-        status.setText(line);
+        refreshButton.animate().cancel();
+        refreshButton.setRotation(0);
+        if (!r.unmatched.isEmpty()) Log.i(TAG, "not on TMDb: " + TextUtils.join(", ", r.unmatched));
+        if (!any && r.error != 0) {
+            // Rows from before stay, with a word that they could not be fetched again; else the word in the rows.
+            if (loadedAt > 0) {
+                Toast.makeText(this, r.error, Toast.LENGTH_LONG).show();
+            } else {
+                placeholder(movies, r.error);
+                placeholder(series, r.error);
+            }
+        }
     }
 
     private void fill(Section s, List<Suggestions.Title> titles) {
@@ -1386,13 +1637,14 @@ public class MainActivity extends Activity {
         TextView t = text(14, Typeface.NORMAL, 0x99FFFFFF);
         t.setText(text);
         t.setGravity(Gravity.CENTER_VERTICAL);
-        s.row.addView(t, new LinearLayout.LayoutParams(-2, dp(135)));
+        s.row.addView(t, new LinearLayout.LayoutParams(-2, dp(TILE_H)));
     }
 
     private int genreLabel(Suggestions.Genre g) {
         switch (g.key) {
             case "drama": return R.string.genre_drama;
             case "comedy": return R.string.genre_comedy;
+            case "romance": return R.string.genre_romance;
             case "crime": return R.string.genre_crime;
             case "action": return R.string.genre_action;
             case "scifi": return R.string.genre_scifi;
@@ -1411,6 +1663,12 @@ public class MainActivity extends Activity {
         d.addState(new int[] {android.R.attr.state_selected}, pill(accent, 0));
         d.addState(new int[] {}, pill(0x1FFFFFFF, 0));
         return d;
+    }
+
+    /** A pill made a circle, for the icon buttons. */
+    private static GradientDrawable round(GradientDrawable g) {
+        g.setShape(GradientDrawable.OVAL);
+        return g;
     }
 
     private GradientDrawable pill(int fill, int stroke) {
@@ -1461,7 +1719,12 @@ public class MainActivity extends Activity {
             if (focused) onFocus.accept(t);
         });
         tile.setOnClickListener(v -> showDetail(t, v));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(92), dp(135));
+        // OK held: saved for later, or no longer.
+        tile.setOnLongClickListener(v -> {
+            toggleSaved(t);
+            return true;
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(TILE_W), dp(TILE_H));
         lp.setMargins(0, 0, dp(12), 0);
         tile.setLayoutParams(lp);
         return tile;
@@ -1504,7 +1767,10 @@ public class MainActivity extends Activity {
     private void open(Suggestions.Title t, Suggestions.Service s) {
         PackageManager pm = getPackageManager();
         if (!t.linksAsked && t.id > 0 && !BuildConfig.MOTN_KEY.isEmpty()) {
-            if (link(t, s) == null && Suggestions.motnService(s.pkg) != null) {
+            // Disney+ is asked even with Wikidata's id: those are its old /series/<slug>/<id> links, which the app
+            // may not open; Movie of the Night has the /browse/entity-… ones. Wikidata's stays the fallback.
+            boolean ask = link(t, s) == null || s.pkg.equals(Suggestions.DISNEY);
+            if (ask && Suggestions.motnService(s.pkg) != null) {
                 t.linksAsked = true;
                 new Thread(() -> {
                     Map<String, String> found = Collections.emptyMap();
@@ -1584,13 +1850,22 @@ public class MainActivity extends Activity {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
     }
 
+    /** A row with its heading, scrolled into view as one (see the rows' scroll view). */
+    private LinearLayout block(LinearLayout rows) {
+        LinearLayout b = new LinearLayout(this);
+        b.setOrientation(LinearLayout.VERTICAL);
+        b.setClipChildren(false);
+        rows.addView(b, new LinearLayout.LayoutParams(-1, -2));
+        return b;
+    }
+
     private LinearLayout row(LinearLayout col) {
         HorizontalScrollView scroll = new HorizontalScrollView(this) {
             /** One tile early: the tile next to the focused one stays in view too, so the row moves on the one before last. */
             @Override
             protected int computeScrollDeltaToGetChildRectOnScreen(Rect rect) {
                 Rect wider = new Rect(rect);
-                wider.inset(-dp(92 + 12), 0);
+                wider.inset(-dp(TILE_W + 12), 0);
                 return super.computeScrollDeltaToGetChildRectOnScreen(wider);
             }
         };

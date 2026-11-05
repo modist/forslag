@@ -2,6 +2,7 @@ package net.steensgaard.forslag;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -345,6 +346,25 @@ public class SuggestionsTest {
         assertEquals(1, both.size());
         assertEquals("Both", both.get(0).name);
         assertEquals(3, Suggestions.matchingAll(Collections.<Suggestions.Genre>emptyList(), titles).size());
+    }
+
+    @Test
+    public void romanceIsAGenreForMoviesAndKeywordsForSeries() {
+        Suggestions.Genre romance = null, comedy = null;
+        for (Suggestions.Genre g : Suggestions.GENRES) {
+            if (g.key.equals("romance")) romance = g;
+            if (g.key.equals("comedy")) comedy = g;
+        }
+        assertTrue(romance.offered(false));
+        assertTrue(romance.offered(true));
+        assertEquals("10749", Suggestions.withGenres(false, Arrays.asList(romance)));
+        assertEquals("", Suggestions.withKeywords(false, Arrays.asList(romance)));
+        assertTrue(romance.names("romantik"));
+
+        String path = Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, Arrays.asList(comedy, romance), 0, "");
+        assertTrue(path, path.contains("&with_genres=35&with_keywords=9840%7C210589"));
+        assertEquals(Arrays.asList(comedy), Suggestions.byIds(true, Arrays.asList(comedy, romance)));
+        assertFalse(romance.byIds(true));
     }
 
     @Test

@@ -2,7 +2,7 @@
 
 What is included in your own streaming subscriptions right now, on one Android TV screen.
 
-![Forslag on a Philips Android TV: Drama and Comedy both on in the movie row, so it shows only comedy-dramas, with Den stygge stedsøster focused; Sort, Age and Top rated at the top and Refresh at the bottom](screenshots/main.jpg)
+![Forslag on a Philips Android TV: Drama and Comedy both on in the movie row, so it shows only comedy-dramas, with Den stygge stedsøster focused; Refresh, Sort, Age and Top rated at the top](screenshots/main.jpg)
 
 [![A one-minute video on YouTube: from the Clean Your TV launcher into Forslag, a genre, Sort and Top rated, and a title opened in HBO Max](https://img.youtube.com/vi/KY-__0FU64A/maxresdefault.jpg)](https://youtu.be/KY-__0FU64A)
 
@@ -10,16 +10,18 @@ What is included in your own streaming subscriptions right now, on one Android T
 ([YouTube](https://youtu.be/KY-__0FU64A)).*
 
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
-mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action, Sci-fi &
-fantasy, Documentary, Entertainment (series), Family & kids and Animation. OK on a genre tab turns it on or off,
+mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Romance, Crime, Action, Sci-fi &
+fantasy, Documentary, Entertainment (series), Family & kids and Animation. TMDb has no romance genre for series, so
+there Romance takes the series TMDb tags "romance" or "searching for love" (How I Met Your Mother, Friends), which
+also lets in a few with a love story on the side. OK on a genre tab turns it on or off,
 and several can be on at once: with Drama and Comedy on, the row shows only titles that are both. All turns every
 genre off again. The row is fetched once the tabs rest, so turning on two genres in a row asks the servers once. A
-**★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in both
+**★** (Top rated) switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in both
 rows, and is remembered. Next to it, **Age** steps with OK through All, Kids (Denmark's age labels A and 7),
 Big kids (11) and Teens & adults (15), set in `age_groups`, and keeps only titles with those labels, in both rows;
 it is remembered too, and the rows follow once the button rests. **Sort** cycles Popular, Newest (release date) and Rating with OK; it
-re-orders the titles the rows already hold, so it is instant and asks no server. **Refresh**, at the bottom
-next to the time of the last update (Down from the series row), asks every source again now, past the cache (pictures aside), and fills both rows anew. Focus a title to see its
+re-orders the titles the rows already hold, so it is instant and asks no server. **↻** (Refresh),
+faint at the left of those buttons, asks every source again now, past the cache (pictures aside), and fills both rows anew; the icon turns while it does. Focus a title to see its
 year, rating, plot and which of your services has it. Press OK for its detail page: the backdrop and poster,
 the year and rating, a movie's running time or a series' seasons and episodes, the first six actors, and the
 plot, with room down to the bottom of the screen. A running series also says when its next episode comes
@@ -33,13 +35,22 @@ that service's app: Netflix, Disney+, HBO Max, Prime Video, DRTV and Viaplay ope
 is a link to it; without one, Prime Video and HBO Max open their search for the title, and the other services
 their home screen. **Back**, at the bottom, or Back on the remote, returns to the rows.
 
-When TMDb has a trailer for the title on YouTube, **▶ Trailer** sits on the poster (Up from the first button). It
+On the poster (Up from the first button) are two round icons. **＋** saves the title for later and turns to
+**✓**; OK on it again removes it. When TMDb has a trailer for the title on YouTube, **🎬** next to it plays it. It
 plays full screen inside Forslag, in YouTube's own embedded player, never in another app: OK pauses and plays,
 Left and Right go 10 seconds back or on, and Back returns to the detail page; it also closes by itself when the
 trailer ends. The trailer is the title's official one in your language where TMDb has it, else in English. If
 YouTube won't play a trailer in an embedded player, Forslag says so, and Back returns.
 
 ![A trailer for How I Met Your Mother playing full screen inside Forslag](screenshots/trailer.jpg)
+
+Saved titles are in a **Saved for later** row below the series, newest first; holding OK on any tile saves it or
+removes it too. The row shows only when something is saved, and the rows scroll up and down with the focus, a
+whole row at a time. At each load Forslag checks which of your services has each saved title now: one on none of
+them is dimmed, put last and marked "Not on your services right now" (it stays, as it may come back), and a saved
+series with an episode from the last week gets a "New episode" badge. The list is kept in the app's own files (at
+most 50 titles), not in the cache, so it shows at once, offline too. It can't be synced with the services' own
+lists, which have no API for it.
 
 The actors are buttons too (Right from the service buttons). OK on one opens their page: their photo, birth and
 a short biography (in English where TMDb has none in your language), and a row of their films and a row of
@@ -61,8 +72,8 @@ It is an ordinary Android TV app (Android 8 and later), and it also declares a m
 |---|---|
 | [TMDb](https://www.themoviedb.org/) | Most titles, plots, posters and genres; which subscription has what comes from JustWatch through TMDb. This product uses the TMDB API but is not endorsed or certified by TMDB. |
 | DRTV and Viaplay | Their own catalogues, for DR's and Viaplay's titles and links. Both APIs are undocumented and unofficial (see [Limits](#limits)). |
-| [Wikidata](https://www.wikidata.org/) (CC0) | The Netflix and Disney+ ids that open a title directly. |
-| [Movie of the Night](https://www.movieofthenight.com/) (optional) | The HBO Max and Prime Video page of a title, and the Netflix and Disney+ page of one Wikidata has no id for, asked when you press OK. Needs a free key of your own. |
+| [Wikidata](https://www.wikidata.org/) (CC0) | The Netflix ids that open a title directly, and Disney+ ids as a fallback. |
+| [Movie of the Night](https://www.movieofthenight.com/) (optional) | The HBO Max, Prime Video and Disney+ page of a title, and the Netflix page of one Wikidata has no id for, asked when you press OK. Needs a free key of your own. |
 
 Every source is free and needs no sign-in. TMDb needs a free API key of your own, and Movie of the Night, if you
 want it, another.
@@ -72,10 +83,11 @@ want it, another.
 1. Make a free TMDb account and ask for an API key at <https://www.themoviedb.org/settings/api>. Either the
    v3 "API Key" or the v4 "API Read Access Token" works.
 2. Optional: make a free account at [Movie of the Night](https://developers.movieofthenight.com/) and copy the
-   API key from its dashboard (the free plan is enough). With it, OK opens the title itself on HBO Max and
-   Prime Video, and on Netflix and Disney+ for titles Wikidata has no id for. Without it, HBO Max and Prime
-   Video open their search for the title, and Netflix and Disney+ (for titles Wikidata lacks) the app's home
-   screen.
+   API key from its dashboard (the free plan is enough). With it, OK opens the title itself on HBO Max, Prime
+   Video and Disney+, and on Netflix for titles Wikidata has no id for. Without it, HBO Max and Prime Video
+   open their search for the title, Netflix (for titles Wikidata lacks) its home screen, and Disney+ only its
+   series or movies page: Wikidata's Disney+ ids are for its old links (`/series/<name>/<id>`), which the app
+   no longer opens a title from.
 3. Put the keys in `local.properties` in the project folder. Git ignores that file, so the keys stay out of the
    repo.
 
@@ -101,7 +113,7 @@ want it, another.
    Each line is the service's name on TMDb, then `|` and the Android TV app's package. Several names,
    separated by commas, cover a renamed service (TMDb calls TV 2 Play just `TV 2`), and a number is read as a
    TMDb provider id. `drtv:` and `viaplay:` take that service's titles from its own catalogue instead of TMDb.
-   A name TMDb does not know is shown in the status line at the bottom of the screen, so you can correct it.
+   A name TMDb does not know is written to the log (`adb logcat -s Forslag`), so you can correct it.
 
 ### Outside Denmark
 
@@ -130,7 +142,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons, the next episode, the cast and the trailers. One request with a person's id and the language when you open an actor's page, for their photo, biography and titles (one more in English when there is no biography in the language), then one per title for where it streams, as for the rows. YouTube's embedded player from `www.youtube.com` when you press Trailer, with the trailer's id; it plays as on any web page with a YouTube video, ads included where YouTube shows them. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
+| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons, the next episode, the cast and the trailers. One request with a person's id and the language when you open an actor's page, for their photo, biography and titles (one more in English when there is no biography in the language), then one per title for where it streams, as for the rows. YouTube's embedded player from `www.youtube.com` when you press Trailer, with the trailer's id; it plays as on any web page with a YouTube video, ads included where YouTube shows them. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on Disney+, or on HBO Max, Prime Video or Netflix without a known link. One request per saved title at each load for where it streams, and one for a saved series' latest episode, cached like the rest. None of these gets a sign-in or anything about you. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
@@ -154,9 +166,9 @@ shown.
   Comedy). Crime, Action, Sci-fi & fantasy, and for series Entertainment and Family & kids each cover more than one
   TMDb genre, so with those the titles are checked in the app instead, out of about 20 per service, and a mix can
   leave a short or empty row.
-- **Opening a title directly** works on DRTV and Viaplay from their own catalogues. On Netflix and Disney+ it
-  needs Wikidata's id for the title (most well-known titles, few new ones) or a Movie of the Night key, and on
-  HBO Max and Prime Video the key; when Movie of the Night has no link for a title there, OK opens the app's
+- **Opening a title directly** works on DRTV and Viaplay from their own catalogues. On Netflix it needs
+  Wikidata's id for the title (most well-known titles, few new ones) or a Movie of the Night key, and on
+  Disney+, HBO Max and Prime Video the key; when Movie of the Night has no link for a title there, OK opens the app's
   search for the title instead. TV 2 Play and YouSee open at their home screen: TV 2 Play's app opens a title
   only from inside itself (its title screen is not exported to other apps, and its one public link,
   `tv2play.dk/start`, opens the front page). Netflix, Disney+ and Prime Video ask for a profile first when they
@@ -179,10 +191,11 @@ shown.
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
 posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids, Drama and Comedy movies together), ★ Top rated on and off, Sort by
 Newest and Rating, the module card, and the detail page (one, two and three services, a movie's running time, a series' seasons, the cast,
-Back on the screen and on the remote), and ▶ Trailer (playing inside the app, pause, seek and Back); the next-episode line (Ghosts); an actor's page (Brad Pitt from Fight Club: photo, biography, films and series, a title opened from it, and Back to Fight Club). OK opened the title itself on DRTV (whether it was running or not), on
+Back on the screen and on the remote), and the trailer (playing inside the app, pause, seek and Back); Saved for later (＋ on the detail page, OK held on a tile, kept after a restart, the rows scrolling); the next-episode line (Ghosts); an actor's page (Brad Pitt from Fight Club: photo, biography, films and series, a title opened from it, and Back to Fight Club). OK opened the title itself on DRTV (whether it was running or not), on
 Viaplay, on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already
 running, and Prime Video's search for The Joy of Painting, which Movie of the Night has no link for. Disney+
-opened the title from a link of the same form sent by hand.
+opened How I Met Your Mother from Movie of the Night's `/browse/entity-…` link, whether it was running or not;
+Wikidata's old `/series/…` link opened only its series page.
 
 ## Licence
 

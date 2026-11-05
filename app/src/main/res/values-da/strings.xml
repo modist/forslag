@@ -8,10 +8,15 @@
     <string name="offline">Kan ikke få forbindelse til TMDb.</string>
     <string name="nothing">TMDb har ingen titler for disse tjenester.</string>
     <string name="no_services">Ingen af dine tjenester blev fundet på TMDb.</string>
-    <string name="unmatched">Ikke på TMDb: %1$s</string>
-    <string name="updated">Opdateret %1$s</string>
     <string name="back">Tilbage</string>
     <string name="trailer_error">YouTube vil ikke afspille traileren her. Tryk Tilbage.</string>
+    <string name="saved_row">Gem til senere</string>
+    <string name="save">Gem til senere</string>
+    <string name="saved_on">Gemt til senere</string>
+    <string name="saved_toast">Gemt til senere: %1$s</string>
+    <string name="removed_toast">Fjernet: %1$s</string>
+    <string name="not_available">Ikke på dine tjenester lige nu</string>
+    <string name="new_episode_badge">Nyt afsnit</string>
     <plurals name="seasons">
         <item quantity="one">%d sæson</item>
         <item quantity="other">%d sæsoner</item>
@@ -48,6 +53,7 @@
     <string name="genre_all">Alle</string>
     <string name="genre_drama">Drama</string>
     <string name="genre_comedy">Komedie</string>
+    <string name="genre_romance">Romantik</string>
     <string name="genre_crime">Krimi</string>
     <string name="genre_action">Action</string>
     <string name="genre_scifi">Sci-fi og fantasy</string>

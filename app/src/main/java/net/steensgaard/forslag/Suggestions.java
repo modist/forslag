@@ -120,6 +120,8 @@ final class Suggestions {
     static final class Genre {
         final String key, movieIds, tvIds;
         final String[] words;
+        /** TMDb keyword ids for series (joined with |) where TMDb has no such series genre, as for romance. */
+        String tvKeywords = "";
 
         Genre(String key, String movieIds, String tvIds, String... words) {
             this.key = key;
@@ -128,7 +130,17 @@ final class Suggestions {
             this.words = words;
         }
 
+        Genre tvKeywords(String ids) {
+            tvKeywords = ids;
+            return this;
+        }
+
         boolean offered(boolean tv) {
+            return !(tv ? tvIds : movieIds).isEmpty() || (tv && !tvKeywords.isEmpty());
+        }
+
+        /** Whether a TMDb title can be checked for this genre from its genre ids; not for keywords alone. */
+        boolean byIds(boolean tv) {
             return !(tv ? tvIds : movieIds).isEmpty();
         }
 
@@ -191,7 +203,7 @@ final class Suggestions {
         StringBuilder b = new StringBuilder();
         for (Genre g : genres) {
             String ids = tv ? g.tvIds : g.movieIds;
-            if (ids.contains("|")) continue;
+            if (ids.isEmpty() || ids.contains("|")) continue;
             if (b.length() > 0) b.append("%2C");
             b.append(ids);
         }
@@ -199,10 +211,31 @@ final class Suggestions {
         return b.toString();
     }
 
+    /** TMDb's with_keywords for the series genres chosen that are keywords, the first such genre's ids; "" for none. */
+    static String withKeywords(boolean tv, List<Genre> genres) {
+        if (!tv || genres == null) return "";
+        for (Genre g : genres) {
+            if (!g.tvKeywords.isEmpty()) return g.tvKeywords.replace("|", "%7C");
+        }
+        return "";
+    }
+
+    /** The genres chosen that a TMDb title's genre ids can be checked for; keyword genres were asked of TMDb. */
+    static List<Genre> byIds(boolean tv, List<Genre> genres) {
+        List<Genre> out = new ArrayList<>();
+        for (Genre g : genres) {
+            if (g.byIds(tv)) out.add(g);
+        }
+        return out;
+    }
+
     /** The tabs after "All", in order. TMDb's ids: https://developer.themoviedb.org/reference/genre-movie-list */
     static final Genre[] GENRES = {
         new Genre("drama", "18", "18", "drama"),
         new Genre("comedy", "35", "35", "humor", "komedie", "satire"),
+        // TMDb has no romance genre for series; its keywords "romance" and "searching for love" stand in.
+        new Genre("romance", "10749", "", "romantik", "romance", "kærlighed", "kaerlighed")
+                .tvKeywords("9840|210589"),
         new Genre("crime", "80|53", "80|9648", "krimi", "thriller"),
         new Genre("action", "28|12", "10759", "action", "eventyr"),
         new Genre("scifi", "878|14", "10765", "sci-fi", "science fiction", "fantasy"),
@@ -267,6 +300,8 @@ final class Suggestions {
             List<Genre> chosen, double minRating, String ageGroup) {
         String with = withGenres(tv, chosen);
         String genres = with.isEmpty() ? "" : "&with_genres=" + with;
+        String keywords = withKeywords(tv, chosen);
+        if (!keywords.isEmpty()) genres += "&with_keywords=" + keywords;
         String rated = minRating > 0 ? "&vote_average.gte=" + minRating : "";
         String aged = ageGroup == null || ageGroup.isEmpty() ? ""
                 : "&certification_country=" + region + "&certification=" + encode(ageGroup);

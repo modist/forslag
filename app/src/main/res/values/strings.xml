@@ -9,12 +9,20 @@
     <string name="offline">Can\'t reach TMDb.</string>
     <string name="nothing">TMDb has no titles for these services.</string>
     <string name="no_services">None of your services were found on TMDb.</string>
-    <string name="unmatched">Not on TMDb: %1$s</string>
-    <string name="updated">Updated %1$s</string>
     <string name="watch_on" translatable="false">▶  %1$s</string>
     <string name="back">Back</string>
-    <string name="trailer_play" translatable="false">▶  Trailer</string>
+    <string name="trailer_play" translatable="false">Trailer</string>
+    <string name="trailer_icon" translatable="false">🎬</string>
+    <string name="save_icon" translatable="false">＋</string>
+    <string name="saved_icon" translatable="false">✓</string>
     <string name="trailer_error">YouTube won’t play this trailer here. Press Back.</string>
+    <string name="saved_row">Saved for later</string>
+    <string name="save">Save for later</string>
+    <string name="saved_on">Saved for later</string>
+    <string name="saved_toast">Saved for later: %1$s</string>
+    <string name="removed_toast">Removed: %1$s</string>
+    <string name="not_available">Not on your services right now</string>
+    <string name="new_episode_badge">New episode</string>
     <plurals name="seasons">
         <item quantity="one">%d season</item>
         <item quantity="other">%d seasons</item>
@@ -38,6 +46,8 @@
     <string name="top_rated">★ Top rated (%1$s+)</string>
     <string name="sort">Sort: %1$s</string>
     <string name="refresh">Refresh</string>
+    <string name="refresh_icon" translatable="false">↻</string>
+    <string name="top_rated_icon" translatable="false">★</string>
     <string name="age">Age: %1$s</string>
     <string name="age_all">All</string>
     <!-- The names of the age groups in config.xml, in the same order. -->
@@ -52,6 +62,7 @@
     <string name="genre_all">All</string>
     <string name="genre_drama">Drama</string>
     <string name="genre_comedy">Comedy</string>
+    <string name="genre_romance">Romance</string>
     <string name="genre_crime">Crime</string>
     <string name="genre_action">Action</string>
     <string name="genre_scifi">Sci-fi &amp; fantasy</string>
