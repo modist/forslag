@@ -148,6 +148,59 @@ public class SuggestionsTest {
     }
 
     @Test
+    public void readsActorIdsAndASeriesNextAndLastEpisode() throws Exception {
+        JSONObject series = new JSONObject("{\"number_of_seasons\":3,"
+                + "\"next_episode_to_air\":{\"air_date\":\"2026-11-14\",\"season_number\":3,\"episode_number\":5},"
+                + "\"last_episode_to_air\":{\"air_date\":\"2026-11-07\",\"season_number\":3,\"episode_number\":4},"
+                + "\"aggregate_credits\":{\"cast\":[{\"id\":10,\"name\":\"A\"},{\"id\":11,\"name\":\"A\"},{\"id\":12,\"name\":\"B\"}]}}");
+        Suggestions.Details d = Suggestions.parseDetails(series, true, 5);
+        assertEquals(Arrays.asList("A", "B"), d.cast);
+        assertEquals(Arrays.asList(10, 12), d.castIds);
+        assertEquals("2026-11-14", d.next.date);
+        assertEquals(3, d.next.season);
+        assertEquals(5, d.next.number);
+        assertEquals("2026-11-07", d.last.date);
+        assertEquals(4, d.last.number);
+        assertEquals("", Suggestions.parseDetails(new JSONObject("{}"), true, 5).next.date);
+    }
+
+    @Test
+    public void readsAnActorsFilmsAndSeries() throws Exception {
+        assertEquals("/person/287?append_to_response=combined_credits&language=da-DK",
+                Suggestions.personPath(287, "da-DK", true));
+        assertEquals("/person/287?language=en-US", Suggestions.personPath(287, "en-US", false));
+        JSONObject credits = new JSONObject("{\"cast\":["
+                + "{\"media_type\":\"movie\",\"id\":550,\"title\":\"Fight Club\",\"release_date\":\"1999-10-15\",\"popularity\":30,\"vote_count\":30000},"
+                + "{\"media_type\":\"tv\",\"id\":1,\"name\":\"Talk\",\"genre_ids\":[10767],\"popularity\":90,\"vote_count\":900},"
+                + "{\"media_type\":\"movie\",\"id\":2,\"title\":\"Doc\",\"character\":\"Himself\",\"popularity\":80,\"vote_count\":900},"
+                + "{\"media_type\":\"movie\",\"id\":3,\"title\":\"Tiny\",\"popularity\":70,\"vote_count\":3},"
+                + "{\"media_type\":\"tv\",\"id\":4,\"name\":\"Friends\",\"first_air_date\":\"1994-09-22\",\"popularity\":60,\"vote_count\":9000},"
+                + "{\"media_type\":\"movie\",\"id\":550,\"title\":\"Fight Club\",\"popularity\":30,\"vote_count\":30000}]}");
+        List<Suggestions.Title> titles = Suggestions.parseCredits(credits, 50);
+        // Most popular first; talk shows, appearances as themselves, few votes and repeats are left out.
+        assertEquals(2, titles.size());
+        assertEquals("Friends", titles.get(0).name);
+        assertTrue(titles.get(0).tv);
+        assertEquals("Fight Club", titles.get(1).name);
+        assertEquals("1999", titles.get(1).year);
+        assertTrue(!titles.get(1).tv);
+
+        // The person request brings the credits along, with the photo, biography and birth.
+        JSONObject person = new JSONObject("{\"name\":\"Brad Pitt\",\"profile_path\":\"/p.jpg\","
+                + "\"biography\":\"First line.\\n\\nSecond  line.\",\"birthday\":\"1963-12-18\","
+                + "\"place_of_birth\":\"Shawnee, Oklahoma, USA\",\"deathday\":null,\"combined_credits\":" + credits + "}");
+        Suggestions.Person p = Suggestions.parsePerson(person, 50);
+        assertEquals("Brad Pitt", p.name);
+        assertEquals("https://image.tmdb.org/t/p/w185/p.jpg", p.photo);
+        assertEquals("First line. Second line.", p.bio);
+        assertEquals("1963-12-18", p.born);
+        assertEquals("Shawnee, Oklahoma, USA", p.place);
+        assertEquals("", p.died);
+        assertEquals(2, p.credits.size());
+        assertTrue(Suggestions.parsePerson(new JSONObject("{}"), 50).credits.isEmpty());
+    }
+
+    @Test
     public void picksTheTrailerFromTmdbVideos() throws Exception {
         JSONObject json = new JSONObject("{\"videos\":{\"results\":["
                 + "{\"site\":\"YouTube\",\"key\":\"clip\",\"type\":\"Clip\",\"iso_639_1\":\"da\",\"official\":true},"

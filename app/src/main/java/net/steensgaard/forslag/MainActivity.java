@@ -71,6 +71,8 @@ public class MainActivity extends Activity {
     private static final int POSTER_W = 180;
     /** How many actors the detail page names. */
     private static final int CAST_MAX = 6;
+    /** How many of an actor's best-known titles are checked for your services. */
+    private static final int PERSON_MAX = 40;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private int accent;
@@ -116,7 +118,20 @@ public class MainActivity extends Activity {
     /** The detail page OK on a title shows over the rows, until Back. */
     private FrameLayout detail;
     private ImageView detailBackdrop, detailPoster;
-    private TextView detailTitle, detailMeta, detailCast, detailOverview, backButton, trailerButton;
+    private TextView detailTitle, detailMeta, detailNext, detailOverview, backButton, trailerButton;
+    /** "Starring" and the actors' buttons. */
+    private LinearLayout detailCast, castChips;
+    /** An actor's page: their films and series on your services, over the rows and under the detail page. */
+    private FrameLayout personPage;
+    private TextView personName, personBorn, personBio, personInfo, personStatus, personMoviesLabel, personSeriesLabel;
+    private ImageView personPhoto;
+    private LinearLayout personMovies, personSeries;
+    /** The detail page the actor's page came from, and where that page came from, for Back. */
+    private Suggestions.Title personFrom;
+    private View personFromReturn;
+    private int personId;
+    /** Bumped on every actor's page, so a slow answer for one that was left is dropped. */
+    private int personGeneration;
     /** The poster and the Trailer button on it. */
     private FrameLayout posterFrame;
     /** The trailer player, full screen over everything while it plays. */
@@ -452,6 +467,7 @@ public class MainActivity extends Activity {
         foot.addView(status, new LinearLayout.LayoutParams(0, -2, 1f));
         col.addView(foot);
 
+        buildPerson(root);
         buildDetail(root);
         trailer = new Trailer(this, root);
         status.setText(R.string.loading);
@@ -536,12 +552,28 @@ public class MainActivity extends Activity {
         detailMeta = oneLine(text(16, Typeface.NORMAL, accent));
         detailMeta.setPadding(0, dp(8), 0, dp(16));
         words.addView(detailMeta);
-        // The actors, once TMDb has answered; hidden until then and for a title it knows none for.
-        detailCast = text(15, Typeface.NORMAL, 0xB3FFFFFF);
-        detailCast.setMaxLines(2);
-        detailCast.setEllipsize(TextUtils.TruncateAt.END);
-        detailCast.setLineSpacing(0, 1.15f);
-        detailCast.setPadding(0, 0, 0, dp(16));
+        // A series' next episode, or one that came out this week; hidden otherwise.
+        detailNext = oneLine(text(16, Typeface.BOLD, 0xFFFFFFFF));
+        detailNext.setPadding(0, 0, 0, dp(16));
+        words.addView(detailNext);
+        // The actors, once TMDb has answered, each a button (Right from the buttons): OK shows their films and
+        // series on your services. Hidden until then and for a title TMDb knows none for.
+        detailCast = new LinearLayout(this);
+        detailCast.setOrientation(LinearLayout.HORIZONTAL);
+        detailCast.setGravity(Gravity.CENTER_VERTICAL);
+        detailCast.setPadding(0, 0, 0, dp(12));
+        TextView starring = text(15, Typeface.NORMAL, 0xB3FFFFFF);
+        starring.setText(R.string.starring);
+        starring.setPadding(0, 0, dp(10), 0);
+        detailCast.addView(starring);
+        HorizontalScrollView castScroll = new HorizontalScrollView(this);
+        castScroll.setHorizontalScrollBarEnabled(false);
+        castScroll.setClipToPadding(false);
+        castScroll.setPadding(0, dp(4), dp(24), dp(4));
+        castChips = new LinearLayout(this);
+        castChips.setOrientation(LinearLayout.HORIZONTAL);
+        castScroll.addView(castChips);
+        detailCast.addView(castScroll, new LinearLayout.LayoutParams(0, -2, 1f));
         words.addView(detailCast);
         detailOverview = text(16, Typeface.NORMAL, 0xDDFFFFFF);
         detailOverview.setEllipsize(TextUtils.TruncateAt.END);
@@ -553,6 +585,238 @@ public class MainActivity extends Activity {
         });
         words.addView(detailOverview, new LinearLayout.LayoutParams(-1, 0, 1f));
         root.addView(detail, new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    /**
+     * An actor's page: their name, the focused title's details, and a row of their films and a row of their series
+     * that are on your services. Under the detail page, so a title on it opens over it. Hidden at first.
+     */
+    private void buildPerson(FrameLayout root) {
+        personPage = new FrameLayout(this);
+        personPage.setBackgroundColor(0xFF000000);
+        personPage.setVisibility(View.GONE);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(48), dp(24), dp(48), dp(14));
+        col.setClipToPadding(false);
+        col.setClipChildren(false);
+        personPage.addView(col, new FrameLayout.LayoutParams(-1, -1));
+        // The photo on the left; name, birth, biography and the focused title on the right.
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        col.addView(head, new LinearLayout.LayoutParams(-1, dp(150)));
+        personPhoto = new ImageView(this);
+        personPhoto.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        personPhoto.setClipToOutline(true);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setCornerRadius(dp(8));
+        shape.setColor(0x1FFFFFFF);
+        personPhoto.setBackground(shape);
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(100), -1);
+        plp.setMargins(0, 0, dp(20), 0);
+        head.addView(personPhoto, plp);
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        head.addView(words, new LinearLayout.LayoutParams(0, -1, 1f));
+        personName = oneLine(text(30, Typeface.BOLD, 0xFFFFFFFF));
+        words.addView(personName);
+        personBorn = oneLine(text(14, Typeface.NORMAL, 0x99FFFFFF));
+        personBorn.setPadding(0, dp(6), 0, 0);
+        words.addView(personBorn);
+        personBio = text(14, Typeface.NORMAL, 0xCCFFFFFF);
+        personBio.setEllipsize(TextUtils.TruncateAt.END);
+        personBio.setLineSpacing(0, 1.15f);
+        personBio.setPadding(0, dp(8), dp(80), 0);
+        // The biography gets the room left in the head: as many lines as fit, then an ellipsis.
+        personBio.addOnLayoutChangeListener((v, l, top, r, bottom, ol, ot, or, ob) -> {
+            int room = bottom - top - personBio.getPaddingTop();
+            int lines = Math.max(1, room / personBio.getLineHeight());
+            if (personBio.getMaxLines() != lines) personBio.post(() -> personBio.setMaxLines(lines));
+        });
+        words.addView(personBio, new LinearLayout.LayoutParams(-1, 0, 1f));
+        personInfo = oneLine(text(15, Typeface.NORMAL, accent));
+        personInfo.setPadding(0, dp(6), 0, 0);
+        words.addView(personInfo);
+        personStatus = text(15, Typeface.NORMAL, 0x99FFFFFF);
+        personStatus.setPadding(0, dp(12), 0, 0);
+        col.addView(personStatus);
+        personMoviesLabel = text(16, Typeface.BOLD, 0xE6FFFFFF);
+        personMoviesLabel.setText(R.string.movies);
+        personMoviesLabel.setPadding(0, dp(8), 0, dp(2));
+        col.addView(personMoviesLabel);
+        personMovies = row(col);
+        personSeriesLabel = text(16, Typeface.BOLD, 0xE6FFFFFF);
+        personSeriesLabel.setText(R.string.series);
+        personSeriesLabel.setPadding(0, dp(8), 0, dp(2));
+        col.addView(personSeriesLabel);
+        personSeries = row(col);
+        root.addView(personPage, new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    /**
+     * OK on an actor: their page instead of the detail page, filled once TMDb has answered. One request for their
+     * photo, biography and credits (one more for an English biography where there is none in the language), and
+     * one per title not yet known for where it streams; all cached like the rows' answers.
+     */
+    private void openPerson(int id, String name) {
+        personFrom = detailOf;
+        personFromReturn = returnTo;
+        personId = id;
+        trailer.close();
+        detail.setVisibility(View.GONE);
+        detailOf = null;
+        returnTo = null;
+        personName.setText(name);
+        personBorn.setText("");
+        personBorn.setVisibility(View.GONE);
+        personBio.setText("");
+        personPhoto.setTag(null);
+        personPhoto.setImageDrawable(null);
+        personInfo.setText("");
+        personStatus.setText(R.string.loading);
+        personStatus.setVisibility(View.VISIBLE);
+        showPersonRow(personMoviesLabel, personMovies, Collections.emptyList());
+        showPersonRow(personSeriesLabel, personSeries, Collections.emptyList());
+        personPage.setVisibility(View.VISIBLE);
+        personPage.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        final int asked = ++personGeneration;
+        new Thread(() -> {
+            Suggestions.Person p;
+            try {
+                p = loadPerson(id);
+            } catch (Exception e) {
+                Log.w(TAG, "person " + id + ": " + e);
+                p = null;
+            }
+            final Suggestions.Person result = p;
+            main.post(() -> {
+                if (asked != personGeneration || isDestroyed() || personPage.getVisibility() != View.VISIBLE) return;
+                showPerson(result, name);
+            });
+        }).start();
+    }
+
+    /**
+     * An actor, with only their films and series that are on your services in credits, most popular first: at most
+     * PERSON_MAX of their titles are checked for where they stream here. Runs off the main thread.
+     */
+    private Suggestions.Person loadPerson(int id) throws Exception {
+        Suggestions.Person p = Suggestions.parsePerson(tmdb.json(Suggestions.personPath(id, language, true)), minVotes);
+        if (p.bio.isEmpty() && !language.startsWith("en")) {
+            try {
+                p.bio = Suggestions.parsePerson(tmdb.json(Suggestions.personPath(id, "en-US", false)), minVotes).bio;
+            } catch (Exception e) {
+                Log.w(TAG, "person " + id + " in English: " + e);
+            }
+        }
+        List<Suggestions.Title> some = new ArrayList<>(p.credits.subList(0, Math.min(PERSON_MAX, p.credits.size())));
+        ExecutorService pool = Executors.newFixedThreadPool(6);
+        for (Suggestions.Title t : some) pool.execute(() -> streamsOn(t));
+        pool.shutdown();
+        pool.awaitTermination(60, TimeUnit.SECONDS);
+        List<Suggestions.Service> services = found;
+        p.credits.clear();
+        for (Suggestions.Title t : some) {
+            Set<Integer> on = streamsOn(t);
+            if (on == null) continue;
+            for (Suggestions.Service s : services) {
+                if (s.providerId >= 0 && on.contains(s.providerId) && !t.services.contains(s)) t.services.add(s);
+            }
+            if (!t.services.isEmpty()) p.credits.add(t);
+        }
+        linkIds(p.credits);
+        return p;
+    }
+
+    private void showPerson(Suggestions.Person p, String name) {
+        if (p == null) {
+            personStatus.setText(R.string.offline);
+            return;
+        }
+        if (!p.photo.isEmpty()) images.load(personPhoto, p.photo);
+        String born = bornLine(p);
+        personBorn.setText(born);
+        personBorn.setVisibility(born.isEmpty() ? View.GONE : View.VISIBLE);
+        personBio.setText(p.bio);
+        List<Suggestions.Title> films = new ArrayList<>(), shows = new ArrayList<>();
+        for (Suggestions.Title t : p.credits) (t.tv ? shows : films).add(t);
+        if (p.credits.isEmpty()) {
+            personStatus.setText(getString(R.string.person_none, name));
+            return;
+        }
+        personStatus.setVisibility(View.GONE);
+        showPersonRow(personMoviesLabel, personMovies, films);
+        showPersonRow(personSeriesLabel, personSeries, shows);
+        View first = firstPersonTile();
+        if (first != null) first.requestFocus();
+    }
+
+    /** "Born 18 December 1963 in Shawnee, Oklahoma, USA", and when they died; "" when TMDb knows neither. */
+    private String bornLine(Suggestions.Person p) {
+        String line = "";
+        if (!p.born.isEmpty()) {
+            line = p.place.isEmpty() ? getString(R.string.born, date(p.born))
+                    : getString(R.string.born_in, date(p.born), p.place);
+        }
+        if (!p.died.isEmpty()) {
+            String died = getString(R.string.died, date(p.died));
+            line = line.isEmpty() ? died : line + "  ·  " + died;
+        }
+        return line;
+    }
+
+    /** "18 December 1963" in the app's language. */
+    private String date(String iso) {
+        try {
+            Date d = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(iso);
+            Locale here = getResources().getConfiguration().getLocales().get(0);
+            return new SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(here, "dMMMMy"), here).format(d);
+        } catch (Exception e) {
+            return iso;
+        }
+    }
+
+    private void showPersonRow(TextView label, LinearLayout row, List<Suggestions.Title> titles) {
+        row.removeAllViews();
+        for (Suggestions.Title t : titles) row.addView(tile(t, this::describePerson));
+        int shown = titles.isEmpty() ? View.GONE : View.VISIBLE;
+        label.setVisibility(shown);
+        ((View) row.getParent()).setVisibility(shown);
+        ((HorizontalScrollView) row.getParent()).scrollTo(0, 0);
+    }
+
+    /** The focused title on an actor's page: its name, year, rating and services under the actor's name. */
+    private void describePerson(Suggestions.Title t) {
+        String meta = metaLine(t, true);
+        personInfo.setText(meta.isEmpty() ? t.name : t.name + "  ·  " + meta);
+    }
+
+    private View firstPersonTile() {
+        return personMovies.getChildCount() > 0 ? personMovies.getChildAt(0)
+                : personSeries.getChildCount() > 0 ? personSeries.getChildAt(0) : null;
+    }
+
+    /** Back on an actor's page: the detail page it came from, with the focus on that actor. */
+    private void closePerson() {
+        personGeneration++;
+        personPage.setVisibility(View.GONE);
+        showPersonRow(personMoviesLabel, personMovies, Collections.emptyList());
+        showPersonRow(personSeriesLabel, personSeries, Collections.emptyList());
+        Suggestions.Title t = personFrom;
+        View from = personFromReturn;
+        personFrom = null;
+        personFromReturn = null;
+        if (t == null) {
+            content.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+            View first = firstTile();
+            if (first != null) first.requestFocus();
+            return;
+        }
+        showDetail(t, from);
+        for (int i = 0; i < castChips.getChildCount(); i++) {
+            View c = castChips.getChildAt(i);
+            if (Integer.valueOf(personId).equals(c.getTag())) c.requestFocus();
+        }
     }
 
     /** The buttons for t, stacked below the poster: Watch on each service that has it, in the order of config.xml, then Back. */
@@ -667,6 +931,7 @@ public class MainActivity extends Activity {
         fillButtons(t);
         detail.setVisibility(View.VISIBLE);
         content.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        personPage.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         firstButton().requestFocus();
     }
 
@@ -686,9 +951,79 @@ public class MainActivity extends Activity {
                     : getString(R.string.runtime_minutes, d.runtime));
         }
         detailMeta.setText(line);
+        String next = episodeLine(d);
+        detailNext.setText(next);
+        detailNext.setVisibility(next.isEmpty() ? View.GONE : View.VISIBLE);
+        detailMeta.setPadding(0, dp(8), 0, next.isEmpty() ? dp(16) : dp(8));
         boolean cast = d != null && !d.cast.isEmpty();
-        detailCast.setText(cast ? getString(R.string.cast, TextUtils.join(", ", d.cast)) : "");
-        detailCast.setVisibility(cast ? View.VISIBLE : View.GONE);
+        castChips.removeAllViews();
+        for (int i = 0; cast && i < d.cast.size(); i++) {
+            int id = i < d.castIds.size() ? d.castIds.get(i) : 0;
+            if (id > 0) castChips.addView(castChip(d.cast.get(i), id));
+        }
+        detailCast.setVisibility(castChips.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** An actor on the detail page: OK shows their films and series on your services. */
+    private TextView castChip(String name, int personId) {
+        TextView c = oneLine(text(15, Typeface.NORMAL, 0xFFFFFFFF));
+        c.setText(name);
+        c.setPadding(dp(12), dp(5), dp(12), dp(5));
+        c.setFocusable(true);
+        StateListDrawable d = new StateListDrawable();
+        d.addState(new int[] {android.R.attr.state_focused}, pill(accent, 0xFFFFFFFF));
+        d.addState(new int[] {}, pill(0x26FFFFFF, 0));
+        c.setBackground(d);
+        c.setTextColor(new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}},
+                new int[] {0xFF15171C, 0xFFFFFFFF}));
+        c.setTag(personId);
+        c.setOnClickListener(v -> openPerson(personId, name));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.setMargins(0, 0, dp(6), 0);
+        c.setLayoutParams(lp);
+        return c;
+    }
+
+    /**
+     * A series' next episode ("Next episode Friday 14 November (S3 E5)", or "Season 4 starts …" for a season's
+     * first), else one that came out in the last week ("New episode …"); "" for a movie, an ended series, or when
+     * TMDb doesn't know.
+     */
+    private String episodeLine(Suggestions.Details d) {
+        if (d == null) return "";
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
+        if (!d.next.date.isEmpty() && d.next.date.compareTo(today) >= 0) {
+            String when = day(d.next.date);
+            return d.next.number == 1 ? getString(R.string.next_season, d.next.season, when)
+                    : getString(R.string.next_episode, when, d.next.season, d.next.number);
+        }
+        if (!d.last.date.isEmpty() && d.last.date.compareTo(today) <= 0 && daysAgo(d.last.date) <= 7) {
+            return getString(R.string.new_episode, day(d.last.date), d.last.season, d.last.number);
+        }
+        return "";
+    }
+
+    /** "Friday 14 November" in the app's language, with the year when it is not this year. */
+    private String day(String iso) {
+        try {
+            Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(iso);
+            Locale here = getResources().getConfiguration().getLocales().get(0);
+            boolean thisYear = iso.startsWith(new SimpleDateFormat("yyyy", Locale.ROOT).format(new Date()));
+            String pattern = android.text.format.DateFormat.getBestDateTimePattern(here,
+                    thisYear ? "EEEEdMMMM" : "EEEEdMMMMy");
+            return new SimpleDateFormat(pattern, here).format(date);
+        } catch (Exception e) {
+            return iso;
+        }
+    }
+
+    private static long daysAgo(String iso) {
+        try {
+            Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(iso);
+            return TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - date.getTime());
+        } catch (Exception e) {
+            return Long.MAX_VALUE;
+        }
     }
 
     /**
@@ -719,8 +1054,11 @@ public class MainActivity extends Activity {
     private void hideDetail() {
         trailer.close();
         detail.setVisibility(View.GONE);
-        content.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
-        View back = returnTo != null && returnTo.isAttachedToWindow() ? returnTo : firstTile();
+        // Opened from an actor's page: back to that page, on the tile it came from.
+        boolean person = personPage.getVisibility() == View.VISIBLE;
+        (person ? personPage : content).setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        View back = returnTo != null && returnTo.isAttachedToWindow() ? returnTo
+                : person ? firstPersonTile() : firstTile();
         if (back != null) back.requestFocus();
         detailOf = null;
         returnTo = null;
@@ -731,6 +1069,10 @@ public class MainActivity extends Activity {
         if (trailer.showing() && trailer.key(e)) return true;
         if (e.getKeyCode() == KeyEvent.KEYCODE_BACK && detail.getVisibility() == View.VISIBLE) {
             if (e.getAction() == KeyEvent.ACTION_UP) hideDetail();
+            return true;
+        }
+        if (e.getKeyCode() == KeyEvent.KEYCODE_BACK && personPage.getVisibility() == View.VISIBLE) {
+            if (e.getAction() == KeyEvent.ACTION_UP) closePerson();
             return true;
         }
         return super.dispatchKeyEvent(e);
@@ -1080,6 +1422,11 @@ public class MainActivity extends Activity {
     }
 
     private View tile(Suggestions.Title t) {
+        return tile(t, this::describe);
+    }
+
+    /** A poster tile; focused, it grows and onFocus shows the title's details. OK opens its detail page. */
+    private View tile(Suggestions.Title t, java.util.function.Consumer<Suggestions.Title> onFocus) {
         FrameLayout tile = new FrameLayout(this);
         tile.setFocusable(true);
         tile.setPadding(dp(3), dp(3), dp(3), dp(3));
@@ -1111,7 +1458,7 @@ public class MainActivity extends Activity {
 
         tile.setOnFocusChangeListener((v, focused) -> {
             v.animate().scaleX(focused ? 1.08f : 1f).scaleY(focused ? 1.08f : 1f).setDuration(120).start();
-            if (focused) describe(t);
+            if (focused) onFocus.accept(t);
         });
         tile.setOnClickListener(v -> showDetail(t, v));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(92), dp(135));

@@ -25,7 +25,14 @@
     </plurals>
     <string name="runtime_hours">%1$d h %2$d min</string>
     <string name="runtime_minutes">%1$d min</string>
-    <string name="cast">Starring %1$s</string>
+    <string name="starring">Starring</string>
+    <string name="next_episode">Next episode %1$s (S%2$d E%3$d)</string>
+    <string name="next_season">Season %1$d starts %2$s</string>
+    <string name="new_episode">New episode %1$s (S%2$d E%3$d)</string>
+    <string name="born">Born %1$s</string>
+    <string name="born_in">Born %1$s in %2$s</string>
+    <string name="died">Died %1$s</string>
+    <string name="person_none">Nothing with %1$s on your services right now.</string>
     <string name="not_installed">%1$s is not installed</string>
     <string name="empty_genre">Nothing like this on your services right now.</string>
     <string name="top_rated">★ Top rated (%1$s+)</string>

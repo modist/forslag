@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -322,8 +323,90 @@ final class Suggestions {
         /** runtime is in minutes. */
         int seasons, episodes, runtime;
         final List<String> cast = new ArrayList<>();
+        /** TMDb's person ids of the actors in cast, in the same order. */
+        final List<Integer> castIds = new ArrayList<>();
         /** The YouTube id of the best trailer (see trailer), or "" when TMDb lists none. */
         String trailer = "";
+        /** A series' next episode and its last one: the air date (2026-11-14, "" when unknown), season and number. */
+        final Episode next = new Episode(), last = new Episode();
+    }
+
+    static final class Episode {
+        String date = "";
+        int season, number;
+
+        static Episode parse(JSONObject json, Episode into) {
+            if (json == null) return into;
+            into.date = str(json, "air_date");
+            into.season = json.optInt("season_number");
+            into.number = json.optInt("episode_number");
+            return into;
+        }
+    }
+
+    /** A person's photo and biography and, with credits, every film and series they played in: one request. */
+    static String personPath(int personId, String language, boolean credits) {
+        return "/person/" + personId + (credits ? "?append_to_response=combined_credits&" : "?") + "language=" + language;
+    }
+
+    /** What an actor's page shows about them: photo (a full URL or ""), biography, birth and death. */
+    static final class Person {
+        String name = "", photo = "", bio = "", born = "", place = "", died = "";
+        /** Their films and series (see parseCredits), before anyone checks where they stream. */
+        final List<Title> credits = new ArrayList<>();
+    }
+
+    /** A person from /person/{id}, with their credits when combined_credits came along. Dates as TMDb gives them. */
+    static Person parsePerson(JSONObject json, int minVotes) {
+        Person p = new Person();
+        p.name = str(json, "name");
+        String photo = str(json, "profile_path");
+        p.photo = photo.isEmpty() ? "" : TMDB_IMAGES + "w185" + photo;
+        p.bio = str(json, "biography").replaceAll("\\s+", " ").trim();
+        p.born = str(json, "birthday");
+        p.place = str(json, "place_of_birth");
+        p.died = str(json, "deathday");
+        JSONObject credits = json.optJSONObject("combined_credits");
+        if (credits != null) p.credits.addAll(parseCredits(credits, minVotes));
+        return p;
+    }
+
+    /**
+     * The films and series a person played in, from /person/{id}/combined_credits, most popular first. Talk shows,
+     * news and appearances as themselves are left out, and so are titles with fewer than minVotes votes on TMDb,
+     * like in the rows. Each title once.
+     */
+    static List<Title> parseCredits(JSONObject json, int minVotes) {
+        List<JSONObject> cast = new ArrayList<>();
+        JSONArray list = json.optJSONArray("cast");
+        for (int i = 0; list != null && i < list.length(); i++) {
+            JSONObject c = list.optJSONObject(i);
+            if (c != null) cast.add(c);
+        }
+        Collections.sort(cast, (a, b) -> Double.compare(b.optDouble("popularity", 0), a.optDouble("popularity", 0)));
+        List<Title> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (JSONObject c : cast) {
+            String type = str(c, "media_type");
+            if (!type.equals("movie") && !type.equals("tv")) continue;
+            if (c.optInt("vote_count", 0) < minVotes) continue;
+            if (str(c, "character").toLowerCase(Locale.ROOT).matches(".*\\b(self|himself|herself|themselves)\\b.*")) continue;
+            JSONArray genres = c.optJSONArray("genre_ids");
+            boolean talk = false;
+            for (int g = 0; genres != null && g < genres.length(); g++) {
+                int id = genres.optInt(g);
+                if (id == 10767 || id == 10763) talk = true;
+            }
+            if (talk || !seen.add(type + c.optInt("id"))) continue;
+            JSONObject one = new JSONObject();
+            try {
+                one.put("results", new JSONArray().put(c));
+            } catch (org.json.JSONException e) {
+                continue;
+            }
+            out.addAll(parseDiscover(one, type.equals("tv")));
+        }
+        return out;
     }
 
     /**
@@ -369,6 +452,8 @@ final class Suggestions {
         if (tv) {
             d.seasons = json.optInt("number_of_seasons");
             d.episodes = json.optInt("number_of_episodes");
+            Episode.parse(json.optJSONObject("next_episode_to_air"), d.next);
+            Episode.parse(json.optJSONObject("last_episode_to_air"), d.last);
         } else {
             d.runtime = json.optInt("runtime");
         }
@@ -377,7 +462,10 @@ final class Suggestions {
         for (int i = 0; cast != null && i < cast.length() && d.cast.size() < castMax; i++) {
             JSONObject p = cast.optJSONObject(i);
             String name = p == null ? "" : p.optString("name", "").trim();
-            if (!name.isEmpty() && !d.cast.contains(name)) d.cast.add(name);
+            if (!name.isEmpty() && !d.cast.contains(name)) {
+                d.cast.add(name);
+                d.castIds.add(p.optInt("id", 0));
+            }
         }
         return d;
     }

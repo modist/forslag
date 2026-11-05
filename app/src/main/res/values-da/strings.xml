@@ -22,7 +22,14 @@
     </plurals>
     <string name="runtime_hours">%1$d t %2$d min</string>
     <string name="runtime_minutes">%1$d min</string>
-    <string name="cast">Medvirkende: %1$s</string>
+    <string name="starring">Medvirkende</string>
+    <string name="next_episode">Næste afsnit %1$s (S%2$d E%3$d)</string>
+    <string name="next_season">Sæson %1$d starter %2$s</string>
+    <string name="new_episode">Nyt afsnit %1$s (S%2$d E%3$d)</string>
+    <string name="born">Født %1$s</string>
+    <string name="born_in">Født %1$s i %2$s</string>
+    <string name="died">Død %1$s</string>
+    <string name="person_none">Intet med %1$s på dine tjenester lige nu.</string>
     <string name="not_installed">%1$s er ikke installeret</string>
     <string name="empty_genre">Ingen titler som disse på dine tjenester lige nu.</string>
     <string name="top_rated">★ Højt vurderet (%1$s+)</string>

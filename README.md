@@ -22,9 +22,10 @@ re-orders the titles the rows already hold, so it is instant and asks no server.
 next to the time of the last update (Down from the series row), asks every source again now, past the cache (pictures aside), and fills both rows anew. Focus a title to see its
 year, rating, plot and which of your services has it. Press OK for its detail page: the backdrop and poster,
 the year and rating, a movie's running time or a series' seasons and episodes, the first six actors, and the
-plot, with room down to the bottom of the screen.
+plot, with room down to the bottom of the screen. A running series also says when its next episode comes
+("Next episode Thursday, 10 December (S6 E3)", or "Season 4 starts …"), or that one came out this week.
 
-![The detail page for How I Met Your Mother: poster with the Trailer button on it, the Disney Plus button and Back on the left; year, rating, seasons, episodes, cast and plot on the right](screenshots/detail.jpg)
+![The detail page for Ghosts: poster with the Trailer button on it, the TV 2 and Netflix buttons and Back on the left; year, rating, seasons and episodes, the next episode, the actors and the plot on the right](screenshots/series.jpg)
 
 Below the poster is a button for each of your services that has the title, with the app's own icon, in the
 order of `config.xml`; the focus starts on the first one whose app is installed. A button opens the title in
@@ -38,9 +39,17 @@ Left and Right go 10 seconds back or on, and Back returns to the detail page; it
 trailer ends. The trailer is the title's official one in your language where TMDb has it, else in English. If
 YouTube won't play a trailer in an embedded player, Forslag says so, and Back returns.
 
-![The same detail page with the Trailer button on the poster focused](screenshots/detail-trailer.jpg)
-
 ![A trailer for How I Met Your Mother playing full screen inside Forslag](screenshots/trailer.jpg)
+
+The actors are buttons too (Right from the service buttons). OK on one opens their page: their photo, birth and
+a short biography (in English where TMDb has none in your language), and a row of their films and a row of
+their series that are on your services, most popular first. OK on a title there opens its detail page; Back goes
+back the way you came, to the actor and then to the title you started from. Talk shows, news, appearances as
+themselves and titles with few votes are left out.
+
+![Fight Club's detail page with Brad Pitt focused among the actors](screenshots/cast.jpg)
+
+![Brad Pitt's page: photo, birth and biography at the top, then his films (Fight Club, Seven, Fury, Once Upon a Time in Hollywood and more) and his series (Friends, King of the Hill, Dave) on your services](screenshots/actor.jpg)
 
 It is an ordinary Android TV app (Android 8 and later), and it also declares a module card for the
 [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher, so it can sit in that launcher's dock
@@ -121,7 +130,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons, the cast and the trailers. YouTube's embedded player from `www.youtube.com` when you press Trailer, with the trailer's id; it plays as on any web page with a YouTube video, ads included where YouTube shows them. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
+| `INTERNET` | Lists from `api.themoviedb.org` and posters from `image.tmdb.org`; each request sends only the region, language, genre, age label, provider or title ids and your key. DRTV's lists from `production.dr-massive.com`, with posters from `prod95-static.dr-massive.com`. Viaplay's most popular and genre pages from `content.viaplay.dk`, with posters from `i-viaplay-com.akamaized.net`. One query per row to `query.wikidata.org` with the TMDb ids of the titles on Netflix and Disney+. One request to `api.themoviedb.org` with a title's id and the language when you open its detail page, for the running time or seasons, the next episode, the cast and the trailers. One request with a person's id and the language when you open an actor's page, for their photo, biography and titles (one more in English when there is no biography in the language), then one per title for where it streams, as for the rows. YouTube's embedded player from `www.youtube.com` when you press Trailer, with the trailer's id; it plays as on any web page with a YouTube video, ads included where YouTube shows them. With a Movie of the Night key, one request to `api.movieofthenight.com` with a title's TMDb id and the country when you press a service's button on it, and only when it is on HBO Max, Prime Video, Netflix or Disney+ without a known link. None of these gets a sign-in or anything about you. |
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
@@ -170,7 +179,7 @@ shown.
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
 posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids, Drama and Comedy movies together), ★ Top rated on and off, Sort by
 Newest and Rating, the module card, and the detail page (one, two and three services, a movie's running time, a series' seasons, the cast,
-Back on the screen and on the remote), and ▶ Trailer (playing inside the app, pause, seek and Back). OK opened the title itself on DRTV (whether it was running or not), on
+Back on the screen and on the remote), and ▶ Trailer (playing inside the app, pause, seek and Back); the next-episode line (Ghosts); an actor's page (Brad Pitt from Fight Club: photo, biography, films and series, a title opened from it, and Back to Fight Club). OK opened the title itself on DRTV (whether it was running or not), on
 Viaplay, on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already
 running, and Prime Video's search for The Joy of Painting, which Movie of the Night has no link for. Disney+
 opened the title from a link of the same form sent by hand.
