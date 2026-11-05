@@ -24,20 +24,21 @@ year, rating, plot and which of your services has it. Press OK for its detail pa
 the year and rating, a movie's running time or a series' seasons and episodes, the first six actors, and the
 plot, with room down to the bottom of the screen.
 
-![The detail page for Interstellar: poster, HBO Max and Amazon Prime Video buttons and Back on the left; year, rating, running time, cast and plot on the right](screenshots/detail-movie.jpg)
+![The detail page for How I Met Your Mother: poster with the Trailer button on it, the Disney Plus button and Back on the left; year, rating, seasons, episodes, cast and plot on the right](screenshots/detail.jpg)
 
 Below the poster is a button for each of your services that has the title, with the app's own icon, in the
 order of `config.xml`; the focus starts on the first one whose app is installed. A button opens the title in
 that service's app: Netflix, Disney+, HBO Max, Prime Video, DRTV and Viaplay open the title itself where there
 is a link to it; without one, Prime Video and HBO Max open their search for the title, and the other services
-their home screen. **Back**, at the bottom, or Back on the remote, returns to the rows. A series shows its
-seasons and episodes ([screenshot](screenshots/detail-series.jpg)).
+their home screen. **Back**, at the bottom, or Back on the remote, returns to the rows.
 
 When TMDb has a trailer for the title on YouTube, **▶ Trailer** sits on the poster (Up from the first button). It
 plays full screen inside Forslag, in YouTube's own embedded player, never in another app: OK pauses and plays,
 Left and Right go 10 seconds back or on, and Back returns to the detail page; it also closes by itself when the
 trailer ends. The trailer is the title's official one in your language where TMDb has it, else in English. If
 YouTube won't play a trailer in an embedded player, Forslag says so, and Back returns.
+
+![The same detail page with the Trailer button on the poster focused](screenshots/detail-trailer.jpg)
 
 ![A trailer for How I Met Your Mother playing full screen inside Forslag](screenshots/trailer.jpg)
 
