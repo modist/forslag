@@ -2,7 +2,7 @@
 
 What is included in your own streaming subscriptions right now, on one Android TV screen.
 
-![Forslag on a Philips Android TV: Drama and Comedy both on in the movie row, so it shows only comedy-dramas, with Den stygge stedsøster focused; Sort, Age and Top rated at the top and Refresh at the bottom](screenshot.jpg)
+![Forslag on a Philips Android TV: Drama and Comedy both on in the movie row, so it shows only comedy-dramas, with Den stygge stedsøster focused; Sort, Age and Top rated at the top and Refresh at the bottom](screenshots/main.jpg)
 
 [![A one-minute video on YouTube: from the Clean Your TV launcher into Forslag, a genre, Sort and Top rated, and a title opened in HBO Max](https://img.youtube.com/vi/KY-__0FU64A/maxresdefault.jpg)](https://youtu.be/KY-__0FU64A)
 
