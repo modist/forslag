@@ -24,8 +24,6 @@ An Android TV app that shows what's included in your own streaming subscriptions
 
 ![Detail page with the saved and trailer icons on the poster](screenshots/detail.jpg)
 
-![A trailer playing inside Forslag](screenshots/trailer.jpg)
-
 ![An actor's page with their films on your services](screenshots/actor.jpg)
 
 It also works as a module card for the [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher.
