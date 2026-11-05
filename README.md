@@ -2,7 +2,7 @@
 
 What is included in your own streaming subscriptions right now, on one Android TV screen.
 
-![Forslag on a Philips Android TV: The Dark Knight focused in the movie row, genre tabs, Refresh, Sort and Top rated](screenshot.jpg)
+![Forslag on a Philips Android TV: Drama and Comedy both on in the movie row, so it shows only comedy-dramas, with Den stygge stedsøster focused; Sort, Age and Top rated at the top and Refresh at the bottom](screenshot.jpg)
 
 [![A one-minute video on YouTube: from the Clean Your TV launcher into Forslag, a genre, Sort and Top rated, and a title opened in HBO Max](https://img.youtube.com/vi/KY-__0FU64A/maxresdefault.jpg)](https://youtu.be/KY-__0FU64A)
 
@@ -11,7 +11,9 @@ What is included in your own streaming subscriptions right now, on one Android T
 
 *Forslag* is Danish for "suggestions". The app shows a row of movies and a row of series, most popular first,
 mixed from each of your services in turn. Each row has genre tabs: All, Drama, Comedy, Crime, Action, Sci-fi &
-fantasy, Documentary, Entertainment (series), Family & kids and Animation; OK on a tab shows that genre. A
+fantasy, Documentary, Entertainment (series), Family & kids and Animation. OK on a genre tab turns it on or off,
+and several can be on at once: with Drama and Comedy on, the row shows only titles that are both. All turns every
+genre off again. The row is fetched once the tabs rest, so turning on two genres in a row asks the servers once. A
 **★ Top rated** switch in the top right corner keeps only titles rated 7.0 or more (`top_rated_min`) in both
 rows, and is remembered. Next to it, **Age** steps with OK through All, Kids (Denmark's age labels A and 7),
 Big kids (11) and Teens & adults (15), set in `age_groups`, and keeps only titles with those labels, in both rows;
@@ -114,7 +116,7 @@ into the APK, so keep the APK to yourself: anyone who wants it builds their own 
 | `<queries>` for launcher activities | To find and open the streaming app a title is on. Nothing is read from other apps. |
 
 No background service, no telemetry, no ads, no account. To keep calls to the APIs few, every answer and
-picture is cached for 76 hours (`cache_hours` in `config.xml`), Wikidata's ids are kept per title, a genre is
+picture is cached for 76 hours (`cache_hours` in `config.xml`), Wikidata's ids are kept per title, a genre (or a mix of them) is
 fetched only when you press OK on its tab, and Movie of the Night is asked only when you press a service's button on a title.
 Opening the app again within that time sends nothing, unless you press Refresh. When a source can't be reached, the last answers are
 shown.
@@ -130,6 +132,10 @@ shown.
   without notice. If one fails, the rows simply have no titles from it.
 - **DRTV in the genre tabs.** DR's lists are not by genre, so a tab keeps the DR titles DR tags with it; in the
   narrower genres there are few.
+- **Several genres at once.** TMDb is asked for titles with all of them when each is a single TMDb genre (Drama +
+  Comedy). Crime, Action, Sci-fi & fantasy, and for series Entertainment and Family & kids each cover more than one
+  TMDb genre, so with those the titles are checked in the app instead, out of about 20 per service, and a mix can
+  leave a short or empty row.
 - **Opening a title directly** works on DRTV and Viaplay from their own catalogues. On Netflix and Disney+ it
   needs Wikidata's id for the title (most well-known titles, few new ones) or a Movie of the Night key, and on
   HBO Max and Prime Video the key; when Movie of the Night has no link for a title there, OK opens the app's
@@ -153,7 +159,7 @@ shown.
 ## Tested on
 
 Philips 2021/22 UHD Android TV (PH1M_EA_9970A), Android 11, with the Clean Your TV launcher: the rows,
-posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids), ★ Top rated on and off, Sort by
+posters, D-pad, genre tabs (Comedy movies, Crime series, Family & kids, Drama and Comedy movies together), ★ Top rated on and off, Sort by
 Newest and Rating, the module card, and the detail page (one, two and three services, a movie's running time, a series' seasons, the cast,
 Back on the screen and on the remote). OK opened the title itself on DRTV (whether it was running or not), on
 Viaplay, on HBO Max and Prime Video (through Movie of the Night) and on Netflix while Netflix was already

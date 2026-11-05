@@ -10,6 +10,7 @@ import org.json.JSONObject;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class SuggestionsTest {
@@ -232,8 +233,8 @@ public class SuggestionsTest {
         Suggestions.Genre fun = genre("entertainment");
         assertTrue(!fun.offered(false));
         assertTrue(fun.offered(true));
-        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, crime, 0, null).contains("&with_genres=80%7C53"));
-        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, crime, 0, null).contains("&with_genres=80%7C9648"));
+        assertTrue(Suggestions.discoverPath(false, 8, "DK", "da-DK", 50, Arrays.asList(crime), 0, null).contains("&with_genres=80%7C53"));
+        assertTrue(Suggestions.discoverPath(true, 8, "DK", "da-DK", 50, Arrays.asList(crime), 0, null).contains("&with_genres=80%7C9648"));
 
         JSONObject tmdb = new JSONObject("{\"results\":[{\"id\":1,\"title\":\"Heat\",\"genre_ids\":[28,53]}]}");
         Suggestions.Title heat = Suggestions.parseDiscover(tmdb, false).get(0);
@@ -251,6 +252,26 @@ public class SuggestionsTest {
         assertTrue(!genre("comedy").matches(police));
         assertTrue(fun.matches(bake));
         assertEquals(1, fun.filter(Arrays.asList(police, bake)).size());
+    }
+
+    @Test
+    public void severalGenresKeepOnlyTitlesWithAllOfThem() throws Exception {
+        Suggestions.Genre drama = genre("drama"), comedy = genre("comedy"), crime = genre("crime");
+        // Single-id genres go to TMDb as "all of" (comma); a genre with several ids is left to matchingAll.
+        assertEquals("18%2C35", Suggestions.withGenres(false, Arrays.asList(drama, comedy)));
+        assertEquals("18", Suggestions.withGenres(false, Arrays.asList(drama, crime)));
+        assertEquals("80%7C53", Suggestions.withGenres(false, Arrays.asList(crime)));
+        assertEquals("", Suggestions.withGenres(false, Collections.<Suggestions.Genre>emptyList()));
+
+        JSONObject tmdb = new JSONObject("{\"results\":["
+                + "{\"id\":1,\"title\":\"Both\",\"genre_ids\":[18,35]},"
+                + "{\"id\":2,\"title\":\"Drama\",\"genre_ids\":[18]},"
+                + "{\"id\":3,\"title\":\"Comedy\",\"genre_ids\":[35]}]}");
+        List<Suggestions.Title> titles = Suggestions.parseDiscover(tmdb, false);
+        List<Suggestions.Title> both = Suggestions.matchingAll(Arrays.asList(drama, comedy), titles);
+        assertEquals(1, both.size());
+        assertEquals("Both", both.get(0).name);
+        assertEquals(3, Suggestions.matchingAll(Collections.<Suggestions.Genre>emptyList(), titles).size());
     }
 
     @Test

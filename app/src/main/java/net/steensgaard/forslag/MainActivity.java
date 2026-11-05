@@ -65,6 +65,8 @@ public class MainActivity extends Activity {
     static final String TAG = "Forslag";
     private static final long BACKDROP_DELAY_MS = 300;
     private static final long AGE_DELAY_MS = 700;
+    /** The same for the genre tabs, which turn on and off one at a time. */
+    private static final long GENRE_DELAY_MS = 700;
     /** The width of the poster on the detail page, and of the buttons below it, in dp. */
     private static final int POSTER_W = 180;
     /** How many actors the detail page names. */
@@ -92,7 +94,7 @@ public class MainActivity extends Activity {
     private volatile String age;
     /** Fetches the rows for the age chosen once the Age button has rested, so stepping past a few asks no server. */
     private final Runnable applyAge = () -> {
-        for (Section s : new Section[] {movies, series}) s.choose(s.genre);
+        for (Section s : new Section[] {movies, series}) s.choose(s.genres);
     };
     /** How the rows are ordered: one of Suggestions.ORDERS. Kept between launches. */
     private String order;
@@ -127,7 +129,10 @@ public class MainActivity extends Activity {
         final LinearLayout row;
         final List<TextView> tabs = new ArrayList<>();
         final Map<String, List<Suggestions.Title>> fetched = new HashMap<>();
-        Suggestions.Genre genre;
+        /** The genre tabs turned on, in the tabs' order; empty for All. A title must have every one of them. */
+        final List<Suggestions.Genre> genres = new ArrayList<>();
+        /** Fetches the row once the genre tabs have rested, so turning on two in a row asks the servers once. */
+        final Runnable apply = () -> choose(genres);
         /** The key of the row on screen (genre and filter), or null while one is loading. */
         String showing;
         /** Bumped on every choice, so a slow answer for a tab that was left is dropped. */
@@ -169,7 +174,7 @@ public class MainActivity extends Activity {
             t.setFocusable(false);
             t.setTag(g);
             // A genre is fetched only on OK, so moving across the tabs costs no API calls.
-            t.setOnClickListener(v -> choose(g));
+            t.setOnClickListener(v -> toggle(g));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(0, 0, dp(6), 0);
             t.setLayoutParams(lp);
@@ -182,23 +187,49 @@ public class MainActivity extends Activity {
         }
 
         void mark() {
-            for (TextView t : tabs) t.setSelected(t.getTag() == genre);
+            for (TextView t : tabs) {
+                Object g = t.getTag();
+                t.setSelected(g == null ? genres.isEmpty() : genres.contains(g));
+            }
+        }
+
+        /** OK on a tab: All turns every genre off; a genre tab turns on or off. The row follows when the tabs rest. */
+        void toggle(Suggestions.Genre g) {
+            if (g == null) {
+                genres.clear();
+            } else if (!genres.remove(g)) {
+                List<Suggestions.Genre> next = new ArrayList<>();
+                for (Suggestions.Genre o : Suggestions.GENRES) {
+                    if (o == g || genres.contains(o)) next.add(o);
+                }
+                genres.clear();
+                genres.addAll(next);
+            }
+            mark();
+            main.removeCallbacks(apply);
+            if (g == null) choose(genres);
+            else main.postDelayed(apply, GENRE_DELAY_MS);
         }
 
         void reset() {
+            main.removeCallbacks(apply);
             fetched.clear();
-            genre = null;
+            genres.clear();
             showing = null;
             generation++;
             mark();
         }
 
-        void choose(Suggestions.Genre g) {
+        void choose(List<Suggestions.Genre> chosen) {
+            final List<Suggestions.Genre> g = new ArrayList<>(chosen);
             final boolean top = topRated;
             final String maxAge = age;
             final String key = key(g, top, maxAge);
             if (key.equals(showing)) return;
-            genre = g;
+            if (chosen != genres) {
+                genres.clear();
+                genres.addAll(g);
+            }
             mark();
             List<Suggestions.Title> known = fetched.get(key);
             if (known != null) {
@@ -233,8 +264,10 @@ public class MainActivity extends Activity {
     }
 
     /** What a section keeps a fetched row under: its genre, whether only top rated titles were asked for, and the age. */
-    private static String key(Suggestions.Genre g, boolean top, String maxAge) {
-        return (g == null ? "all" : g.key) + (top ? ":top" : "") + (maxAge.isEmpty() ? "" : ":age" + maxAge);
+    private static String key(List<Suggestions.Genre> gs, boolean top, String maxAge) {
+        StringBuilder b = new StringBuilder();
+        for (Suggestions.Genre g : gs) b.append(b.length() > 0 ? "+" : "").append(g.key);
+        return (gs.isEmpty() ? "all" : b.toString()) + (top ? ":top" : "") + (maxAge.isEmpty() ? "" : ":age" + maxAge);
     }
 
     /** The next age group on OK: all, then each group from the youngest, then all again. The rows follow when it rests. */
@@ -278,7 +311,7 @@ public class MainActivity extends Activity {
         topRated = !topRated;
         topToggle.setSelected(topRated);
         prefs.edit().putBoolean("top_rated", topRated).apply();
-        for (Section s : new Section[] {movies, series}) s.choose(s.genre);
+        for (Section s : new Section[] {movies, series}) s.choose(s.genres);
     }
 
     /**
@@ -414,10 +447,6 @@ public class MainActivity extends Activity {
         status = oneLine(text(12, Typeface.NORMAL, 0x80FFFFFF));
         foot.addView(status, new LinearLayout.LayoutParams(0, -2, 1f));
         col.addView(foot);
-        TextView credit = oneLine(text(11, Typeface.NORMAL, 0x66FFFFFF));
-        credit.setText(R.string.attribution);
-        credit.setPadding(0, dp(2), 0, 0);
-        col.addView(credit);
 
         buildDetail(root);
         status.setText(R.string.loading);
@@ -720,8 +749,8 @@ public class MainActivity extends Activity {
                     else r.unmatched.add(s.names[0]);
                 }
                 found = usable;
-                r.movies = buildRow(false, null, top, maxAge);
-                r.series = buildRow(true, null, top, maxAge);
+                r.movies = buildRow(false, Collections.emptyList(), top, maxAge);
+                r.series = buildRow(true, Collections.emptyList(), top, maxAge);
                 if (usable.isEmpty()) r.error = R.string.no_services;
                 else if (r.movies.isEmpty() && r.series.isEmpty()) r.error = R.string.nothing;
             } catch (Tmdb.KeyRefused e) {
@@ -735,11 +764,11 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * One row: each service's titles (of one genre, or all), mixed in turns, with the TMDb titles checked against
+     * One row: each service's titles (with every genre chosen, or all), mixed in turns, with the TMDb titles checked against
      * what each service really streams, and links looked up. With an age group, only titles with one of its labels.
      * Runs off the main thread.
      */
-    private List<Suggestions.Title> buildRow(boolean tv, Suggestions.Genre genre, boolean top, String maxAge)
+    private List<Suggestions.Title> buildRow(boolean tv, List<Suggestions.Genre> genres, boolean top, String maxAge)
             throws Exception {
         double minRating = top ? topMin : 0;
         List<Suggestions.Service> services = found;
@@ -751,13 +780,15 @@ public class MainActivity extends Activity {
                     // DR's lists are not by genre; the tab keeps the titles DR tags with it.
                     l = Suggestions.parseDrtv(tmdb.open(Suggestions.drtvListUrl(
                             getString(tv ? R.string.drtv_series : R.string.drtv_movies))), tv);
-                    if (genre != null) l = genre.filter(l);
+                    l = Suggestions.matchingAll(genres, l);
                 } else if (s.source.equals(Suggestions.FROM_VIAPLAY)) {
-                    l = viaplay(tv, genre);
+                    l = viaplay(tv, genres);
                 } else {
                     l = Suggestions.parseDiscover(tmdb.json(
-                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genre, minRating,
+                            Suggestions.discoverPath(tv, s.providerId, region, language, minVotes, genres, minRating,
                                     maxAge)), tv);
+                    // With several genres TMDb can't be asked for all of them in every case (see withGenres).
+                    if (genres.size() > 1) l = Suggestions.matchingAll(genres, l);
                 }
             } catch (Tmdb.KeyRefused e) {
                 throw e;
@@ -796,19 +827,29 @@ public class MainActivity extends Activity {
 
     /**
      * Viaplay's most popular films or series in the subscription, from its own catalogue: its genre page where it
-     * has one for the genre, else its "all" pages filtered by each title's genres. A few pages, about 30 titles.
+     * has one for a genre chosen, else its "all" pages, filtered by each title's genres so it has every genre chosen.
+     * A few pages, about 30 titles.
      */
-    private List<Suggestions.Title> viaplay(boolean tv, Suggestions.Genre genre) throws Exception {
+    private List<Suggestions.Title> viaplay(boolean tv, List<Suggestions.Genre> genres) throws Exception {
         JSONObject all = tmdb.open(Suggestions.viaplayAllUrl(tv));
-        String url = genre == null ? null : Suggestions.viaplayGenreUrl(all, genre);
-        JSONObject page = genre == null || url == null ? all : tmdb.open(url);
+        // The first genre chosen that Viaplay has a page for; the titles there are checked for the other genres only.
+        String url = null;
+        List<Suggestions.Genre> rest = new ArrayList<>(genres);
+        for (Suggestions.Genre g : genres) {
+            url = Suggestions.viaplayGenreUrl(all, g);
+            if (url != null) {
+                rest.remove(g);
+                break;
+            }
+        }
+        JSONObject page = url == null ? all : tmdb.open(url);
         SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT);
         iso.setTimeZone(TimeZone.getTimeZone("UTC"));
         String now = iso.format(new Date());
         List<Suggestions.Title> out = new ArrayList<>();
         for (int pages = 1; ; pages++) {
             List<Suggestions.Title> got = Suggestions.parseViaplay(page, tv, now);
-            out.addAll(genre != null && url == null ? genre.filter(got) : got);
+            out.addAll(Suggestions.matchingAll(rest, got));
             String next = Suggestions.viaplayNext(page);
             if (next == null || pages >= 3 || out.size() >= perRow) return out;
             page = tmdb.open(next);
@@ -916,9 +957,9 @@ public class MainActivity extends Activity {
             loadedAt = System.currentTimeMillis();
             for (Section s : new Section[] {movies, series}) {
                 s.reset();
-                s.fetched.put(key(null, r.top, r.age), s.tv ? r.series : r.movies);
+                s.fetched.put(key(Collections.emptyList(), r.top, r.age), s.tv ? r.series : r.movies);
                 fill(s, s.tv ? r.series : r.movies);
-                s.showing = key(null, r.top, r.age);
+                s.showing = key(Collections.emptyList(), r.top, r.age);
                 s.enableTabs();
                 topToggle.setFocusable(true);
                 sortButton.setFocusable(true);

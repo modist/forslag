@@ -50,5 +50,4 @@
     <string name="genre_entertainment">Entertainment</string>
     <string name="genre_family">Family &amp; kids</string>
     <string name="genre_animation">Animation</string>
-    <string name="attribution" translatable="false">This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming data: JustWatch.</string>
 </resources>

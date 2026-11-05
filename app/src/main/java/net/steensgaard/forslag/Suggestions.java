@@ -162,6 +162,42 @@ final class Suggestions {
         }
     }
 
+    /** The titles that match every genre given: Drama and Comedy keep only titles that are both. All when none. */
+    static List<Title> matchingAll(List<Genre> genres, List<Title> titles) {
+        if (genres == null || genres.isEmpty()) return titles;
+        List<Title> out = new ArrayList<>();
+        for (Title t : titles) {
+            boolean all = true;
+            for (Genre g : genres) {
+                if (!g.matches(t)) {
+                    all = false;
+                    break;
+                }
+            }
+            if (all) out.add(t);
+        }
+        return out;
+    }
+
+    /**
+     * TMDb's with_genres for the genres chosen, all of them at once: one genre as its ids ("any of", |); several as
+     * the single-id genres joined with a comma ("all of"). A genre with several ids can't be put in that, so it is
+     * left to matchingAll, unless every genre has several: then the first one's ids. "" for none.
+     */
+    static String withGenres(boolean tv, List<Genre> genres) {
+        if (genres == null || genres.isEmpty()) return "";
+        if (genres.size() == 1) return (tv ? genres.get(0).tvIds : genres.get(0).movieIds).replace("|", "%7C");
+        StringBuilder b = new StringBuilder();
+        for (Genre g : genres) {
+            String ids = tv ? g.tvIds : g.movieIds;
+            if (ids.contains("|")) continue;
+            if (b.length() > 0) b.append("%2C");
+            b.append(ids);
+        }
+        if (b.length() == 0) return (tv ? genres.get(0).tvIds : genres.get(0).movieIds).replace("|", "%7C");
+        return b.toString();
+    }
+
     /** The tabs after "All", in order. TMDb's ids: https://developer.themoviedb.org/reference/genre-movie-list */
     static final Genre[] GENRES = {
         new Genre("drama", "18", "18", "drama"),
@@ -226,9 +262,10 @@ final class Suggestions {
      * labels in it joined with |, such as "A|7"), only titles with one of those labels in the region; TMDb leaves
      * out those without a label.
      */
-    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes, Genre genre,
-            double minRating, String ageGroup) {
-        String genres = genre == null ? "" : "&with_genres=" + (tv ? genre.tvIds : genre.movieIds).replace("|", "%7C");
+    static String discoverPath(boolean tv, int providerId, String region, String language, int minVotes,
+            List<Genre> chosen, double minRating, String ageGroup) {
+        String with = withGenres(tv, chosen);
+        String genres = with.isEmpty() ? "" : "&with_genres=" + with;
         String rated = minRating > 0 ? "&vote_average.gte=" + minRating : "";
         String aged = ageGroup == null || ageGroup.isEmpty() ? ""
                 : "&certification_country=" + region + "&certification=" + encode(ageGroup);
