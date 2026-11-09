@@ -416,10 +416,12 @@ public class SuggestionsTest {
                 + "{\"service\":{\"id\":\"hbo\"},\"type\":\"addon\",\"link\":\"https://www.primevideo.com/x\"},"
                 + "{\"service\":{\"id\":\"hbo\"},\"type\":\"subscription\",\"link\":\"https://play.max.com/movie/abc\"},"
                 + "{\"service\":{\"id\":\"netflix\"},\"type\":\"subscription\",\"link\":\"https://www.netflix.com/title/70021642/\"},"
-                + "{\"service\":{\"id\":\"prime\"},\"type\":\"subscription\",\"link\":\"https://app.primevideo.com/detail?gti=g\"}],"
+                + "{\"service\":{\"id\":\"prime\"},\"type\":\"subscription\",\"link\":\"https://app.primevideo.com/detail?gti=g\"},"
+                + "{\"service\":{\"id\":\"apple\"},\"type\":\"subscription\",\"link\":\"https://tv.apple.com/dk/movie/m/umc.cmc.1\"}],"
                 + "\"se\":[{\"service\":{\"id\":\"disney\"},\"type\":\"subscription\",\"link\":\"https://www.disneyplus.com/x\"}]}}");
         java.util.Map<String, String> links = Suggestions.parseMotn(json, "DK");
-        assertEquals(3, links.size());
+        assertEquals(4, links.size());
+        assertEquals("https://tv.apple.com/dk/movie/m/umc.cmc.1", links.get(Suggestions.APPLE));
         assertEquals("https://app.primevideo.com/detail?gti=g", links.get(Suggestions.PRIME));
         assertEquals("https://play.max.com/movie/abc", links.get(Suggestions.HBO));
         assertEquals("https://www.netflix.com/title/70021642/", links.get(Suggestions.NETFLIX));

@@ -10,7 +10,7 @@
          so you can fix the name. "drtv:" or "viaplay:" in front takes that service's titles from its own catalogue
          instead (DR's lists below; Viaplay's most popular titles included in the subscription, and its genre
          pages). Watch on a title's detail page (OK on it) opens it directly on Netflix, Disney+, DRTV and Viaplay when there is a link to it,
-         and on HBO Max and Prime Video with a Movie of the Night key (motn.key); without a link, Prime Video and
+         and on HBO Max, Prime Video and Apple TV with a Movie of the Night key (motn.key); without a link, Prime Video and
          HBO Max open their search for the title, and other services the first of their apps that is installed. -->
     <string-array name="services" translatable="false">
         <item>Netflix|com.netflix.ninja</item>
@@ -21,6 +21,8 @@
         <item>viaplay:Viaplay|com.viaplay.android</item>
         <item>Amazon Prime Video|com.amazon.amazonvideo.livingroom</item>
         <item>YouSee Play,YouSee|dk.yousee.tv.leanback</item>
+        <!-- Apple TV (formerly Apple TV+) by TMDb id: TMDb's "Apple TV" name is also Apple's rental store. -->
+        <item>350,Apple TV Plus,Apple TV+|com.apple.atve.androidtv.appletv</item>
     </string-array>
 
     <!-- DRTV's lists for the two rows (production.dr-massive.com, DR's unofficial API): films "Film | Netop

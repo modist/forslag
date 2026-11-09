@@ -32,7 +32,7 @@ It also works as a module card for the [Clean Your TV](https://github.com/Gathin
 
 1. Get a free TMDb API key at <https://www.themoviedb.org/settings/api>.
 2. Optional: get a free [Movie of the Night](https://developers.movieofthenight.com/) key. It lets the app open
-   titles directly on Disney+, HBO Max, Prime Video and some Netflix titles. Without it, these apps open on
+   titles directly on Disney+, HBO Max, Prime Video, Apple TV and some Netflix titles. Without it, these apps open on
    their search or home screen.
 3. Add the keys to `local.properties`, which Git ignores:
 
@@ -70,7 +70,7 @@ The keys are compiled into the APK, so don't share it.
 | [TMDb](https://www.themoviedb.org/) | Titles, posters, plots and which service has what (data from JustWatch). *This product uses the TMDB API but is not endorsed or certified by TMDB.* |
 | DRTV and Viaplay | Their own catalogues, through unofficial APIs. |
 | [Wikidata](https://www.wikidata.org/) | Netflix ids, for opening titles directly. |
-| [Movie of the Night](https://www.movieofthenight.com/) | Links to titles on Disney+, HBO Max and Prime Video. Asked only when you press a service's button. |
+| [Movie of the Night](https://www.movieofthenight.com/) | Links to titles on Disney+, HBO Max, Prime Video and Apple TV. Asked only when you press a service's button. |
 | YouTube | Trailers, in its embedded player. |
 
 The app has no account, no telemetry and no ads. Requests contain only title ids, region, language and your API

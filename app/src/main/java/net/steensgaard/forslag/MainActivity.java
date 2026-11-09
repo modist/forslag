@@ -1759,9 +1759,9 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Opens the title on service s: a link to it where there is one (Netflix, Disney+, HBO Max, Prime Video, DRTV,
-     * Viaplay), else the app's search for it (Prime Video, HBO Max), else the app at its home screen. When s has no
-     * link yet and is HBO Max, Netflix, Disney+ or Prime Video, Movie of the Night is asked first, once per title
+     * Opens the title on service s: a link to it where there is one (Netflix, Disney+, HBO Max, Prime Video, Apple TV,
+     * DRTV, Viaplay), else the app's search for it (Prime Video, HBO Max), else the app at its home screen. When s has
+     * no link yet and is HBO Max, Netflix, Disney+, Prime Video or Apple TV, Movie of the Night is asked first, once per title
      * (its answer covers every service): one request per press, never while browsing.
      */
     private void open(Suggestions.Title t, Suggestions.Service s) {
