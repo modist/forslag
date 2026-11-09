@@ -26,7 +26,16 @@ An Android TV app that shows what's included in your own streaming subscriptions
 
 ![An actor's page with their films on your services](screenshots/actor.jpg)
 
-It also works as a module card for the [Clean Your TV](https://github.com/Gathin23/cleanyourtv) launcher.
+## Clean Your TV
+
+Forslag works as a module card in [Clean Your TV](https://github.com/Gathin23/cleanyourtv), a clean
+Android TV launcher. Install Forslag and it shows up as a card in the launcher's dock, labelled "Forslag" in
+Forslag's yellow, and the card opens the app.
+
+Nothing needs to be set up. The card is declared in
+[`AndroidManifest.xml`](app/src/main/AndroidManifest.xml), with the `com.gathin.tvhome.category.DOCK_CARD`
+category, and in [`module_card.xml`](app/src/main/res/xml/module_card.xml), which gives its label, caption and
+colour. The format is described in `docs/modules.md` in the Clean Your TV repository.
 
 ## Set up
 
